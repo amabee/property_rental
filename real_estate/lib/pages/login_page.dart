@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:real_estate/pages/home.dart';
+import 'package:real_estate/pages/admin_pages/admin_home.dart';
 
 class LoginScreen extends StatefulWidget {
   final Function toggleTheme;
@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen>
         context,
         MaterialPageRoute(
           builder:
-              (context) => HomeScreen(
+              (context) => AdminHomeScreen(
                 toggleTheme: widget.toggleTheme,
                 isDarkMode: widget.isDarkMode,
               ),

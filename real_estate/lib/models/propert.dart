@@ -7,8 +7,7 @@ class Property {
   final int bathrooms;
   final int area;
   final String imageUrl;
-  bool isFavorite;
-  final bool isMyProperty;
+  final bool isAvailable;
 
   Property({
     required this.id,
@@ -19,7 +18,6 @@ class Property {
     required this.bathrooms,
     required this.area,
     required this.imageUrl,
-    required this.isFavorite,
-    required this.isMyProperty,
+    required this.isAvailable,
   });
 }

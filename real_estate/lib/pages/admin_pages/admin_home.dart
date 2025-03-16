@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:real_estate/models/propert.dart';
+import 'package:real_estate/pages/admin_pages/house_types.dart';
+import 'package:real_estate/pages/admin_pages/tenants.dart';
 import 'package:real_estate/pages/login_page.dart';
 
-class HomeScreen extends StatefulWidget {
+class AdminHomeScreen extends StatefulWidget {
   final Function toggleTheme;
   final bool isDarkMode;
 
-  HomeScreen({required this.toggleTheme, required this.isDarkMode});
+  AdminHomeScreen({required this.toggleTheme, required this.isDarkMode});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _AdminHomeScreenState createState() => _AdminHomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final List<Property> _myProperties = [
     Property(
       id: '1',
@@ -25,8 +25,7 @@ class _HomeScreenState extends State<HomeScreen>
       bathrooms: 3,
       area: 2500,
       imageUrl: 'https://via.placeholder.com/300',
-      isFavorite: true,
-      isMyProperty: true,
+      isAvailable: true,
     ),
     Property(
       id: '2',
@@ -37,76 +36,9 @@ class _HomeScreenState extends State<HomeScreen>
       bathrooms: 2,
       area: 1200,
       imageUrl: 'https://via.placeholder.com/300',
-      isFavorite: false,
-      isMyProperty: true,
+      isAvailable: false,
     ),
   ];
-
-  final List<Property> _marketProperties = [
-    Property(
-      id: '3',
-      title: 'Suburban Family Home',
-      address: '789 Oak Rd, Greentown',
-      price: 520000,
-      bedrooms: 3,
-      bathrooms: 2,
-      area: 1800,
-      imageUrl: 'https://via.placeholder.com/300',
-      isFavorite: true,
-      isMyProperty: false,
-    ),
-    Property(
-      id: '4',
-      title: 'Beachfront Condo',
-      address: '101 Coast Blvd, Seaside',
-      price: 850000,
-      bedrooms: 3,
-      bathrooms: 3,
-      area: 2000,
-      imageUrl: 'https://via.placeholder.com/300',
-      isFavorite: false,
-      isMyProperty: false,
-    ),
-    Property(
-      id: '5',
-      title: 'Mountain Retreat',
-      address: '222 Pine Pass, Highland',
-      price: 450000,
-      bedrooms: 2,
-      bathrooms: 2,
-      area: 1500,
-      imageUrl: 'https://via.placeholder.com/300',
-      isFavorite: false,
-      isMyProperty: false,
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  void _toggleFavorite(Property property) {
-    setState(() {
-      property.isFavorite = !property.isFavorite;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          property.isFavorite ? 'Added to favorites' : 'Removed from favorites',
-        ),
-        duration: Duration(seconds: 1),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,23 +50,9 @@ class _HomeScreenState extends State<HomeScreen>
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
             onPressed: () => widget.toggleTheme(),
           ),
-          IconButton(icon: Icon(Icons.notifications), onPressed: () {}),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [Tab(text: 'My Properties'), Tab(text: 'Marketplace')],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // My Properties Tab
-          _buildPropertyList(_myProperties),
-
-          // Marketplace Tab
-          _buildPropertyList(_marketProperties),
         ],
       ),
+      body: _buildPropertyList(_myProperties),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // Add new property action
@@ -175,41 +93,66 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
             ListTile(
-              leading: Icon(Icons.home),
-              title: Text('Home'),
+              leading: Icon(Icons.dashboard),
+              title: Text('House Types'),
               onTap: () {
                 Navigator.pop(context);
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder:
+                        (context) => HouseTypesScreen(
+                          toggleTheme: widget.toggleTheme,
+                          isDarkMode: widget.isDarkMode,
+                        ),
+                  ),
+                );
               },
             ),
             ListTile(
-              leading: Icon(Icons.favorite),
-              title: Text('Favorites'),
+              leading: Icon(Icons.home),
+              title: Text('Houses'),
               onTap: () {
                 Navigator.pop(context);
               },
             ),
             ListTile(
               leading: Icon(Icons.history),
-              title: Text('History'),
+              title: Text('Tenants'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder:
+                        (context) => TenantScreen(
+                          toggleTheme: widget.toggleTheme,
+                          isDarkMode: widget.isDarkMode,
+                        ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.payment),
+              title: Text('Payments'),
               onTap: () {
                 Navigator.pop(context);
               },
             ),
             ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('Settings'),
+              leading: Icon(Icons.data_exploration_rounded),
+              title: Text('Reports'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.people),
+              title: Text('Users'),
               onTap: () {
                 Navigator.pop(context);
               },
             ),
             Divider(),
-            ListTile(
-              leading: Icon(Icons.help_outline),
-              title: Text('Help & Support'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
             ListTile(
               leading: Icon(Icons.exit_to_app),
               title: Text('Logout'),
@@ -251,7 +194,6 @@ class _HomeScreenState extends State<HomeScreen>
             final property = properties[index];
             return PropertyCard(
               property: property,
-              onFavoriteToggle: () => _toggleFavorite(property),
               isDarkMode: widget.isDarkMode,
             );
           },
@@ -262,14 +204,9 @@ class _HomeScreenState extends State<HomeScreen>
 // Property Card Widget
 class PropertyCard extends StatelessWidget {
   final Property property;
-  final Function onFavoriteToggle;
   final bool isDarkMode;
 
-  PropertyCard({
-    required this.property,
-    required this.onFavoriteToggle,
-    required this.isDarkMode,
-  });
+  PropertyCard({required this.property, required this.isDarkMode});
 
   @override
   Widget build(BuildContext context) {
@@ -302,43 +239,23 @@ class PropertyCard extends StatelessWidget {
               ),
               Positioned(
                 top: 10,
-                right: 10,
-                child: CircleAvatar(
-                  backgroundColor:
-                      isDarkMode
-                          ? Colors.black.withOpacity(0.6)
-                          : Colors.white.withOpacity(0.8),
-                  child: IconButton(
-                    icon: Icon(
-                      property.isFavorite
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                      color: property.isFavorite ? Colors.red : null,
+                left: 10,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: property.isAvailable ? Colors.green : Colors.red,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    property.isAvailable ? 'AVAILABLE' : 'RENTED',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
-                    onPressed: () => onFavoriteToggle(),
                   ),
                 ),
               ),
-              if (property.isMyProperty)
-                Positioned(
-                  top: 10,
-                  left: 10,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'MY PROPERTY',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
           Padding(
@@ -387,27 +304,6 @@ class PropertyCard extends StatelessWidget {
                 ),
                 SizedBox(height: 16),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildFeature(
-                      context,
-                      Icons.king_bed_outlined,
-                      '${property.bedrooms} Beds',
-                    ),
-                    _buildFeature(
-                      context,
-                      Icons.bathtub_outlined,
-                      '${property.bathrooms} Baths',
-                    ),
-                    _buildFeature(
-                      context,
-                      Icons.straighten,
-                      '${property.area} sqft',
-                    ),
-                  ],
-                ),
-                SizedBox(height: 16),
-                Row(
                   children: [
                     Expanded(
                       child: ElevatedButton(
@@ -422,7 +318,7 @@ class PropertyCard extends StatelessWidget {
                       onPressed: () {
                         // Contact owner action
                       },
-                      child: Text(property.isMyProperty ? 'Edit' : 'Contact'),
+                      child: Text('Edit'),
                     ),
                   ],
                 ),
@@ -431,16 +327,6 @@ class PropertyCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildFeature(BuildContext context, IconData icon, String text) {
-    return Column(
-      children: [
-        Icon(icon, color: Theme.of(context).primaryColor),
-        SizedBox(height: 4),
-        Text(text),
-      ],
     );
   }
 }
