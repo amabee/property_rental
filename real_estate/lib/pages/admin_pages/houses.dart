@@ -11,6 +11,7 @@ import 'package:real_estate/pages/admin_pages/users.dart';
 import 'package:real_estate/pages/login_page.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:real_estate/util/links.dart';
 
 class HousesScreen extends StatefulWidget {
   final Function toggleTheme;
@@ -24,7 +25,7 @@ class HousesScreen extends StatefulWidget {
 
 class _HousesScreenState extends State<HousesScreen> {
   List<Property> _houses = [];
-  List<String> _houseTypeOptions = [];
+  List<Map<String, dynamic>> _houseTypeOptions = [];
 
   bool _isLoading = true;
 
@@ -71,9 +72,9 @@ class _HousesScreenState extends State<HousesScreen> {
       setState(() {
         _houseTypeOptions =
             houseTypesData
-                .map<String>(
-                  (type) => type['name'].toString(),
-                ) // Assuming API returns {'id': 1, 'name': 'Apartment'}
+                .map<Map<String, dynamic>>(
+                  (type) => {'id': type['id'], 'name': type['name']},
+                )
                 .toList();
       });
     } else {
@@ -275,7 +276,12 @@ class _HousesScreenState extends State<HousesScreen> {
           itemCount: houses.length,
           itemBuilder: (context, index) {
             final house = houses[index];
-            return HouseCard(house: house, isDarkMode: widget.isDarkMode);
+            return HouseCard(
+              house: house,
+              isDarkMode: widget.isDarkMode,
+              onViewDetails: _showHouseDetailsModal,
+              onEdit: _showEditHouseModal,
+            );
           },
         );
   }
@@ -285,21 +291,9 @@ class _HousesScreenState extends State<HousesScreen> {
     String houseNo = '';
     String description = '';
     String category = '';
-    double price = 0.0;
+    int price = 0;
     File? selectedImage;
     final ImagePicker _picker = ImagePicker();
-
-    // Create a list of categories to choose from
-    final List<String> categories = [
-      'Apartment',
-      'House',
-      'Condo',
-      'Studio',
-      'Penthouse',
-    ];
-
-    // Default selection
-    category = categories[0];
 
     Future<void> _pickImage() async {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -323,7 +317,6 @@ class _HousesScreenState extends State<HousesScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // House Number
                       TextFormField(
                         decoration: InputDecoration(
                           labelText: 'House No',
@@ -350,19 +343,20 @@ class _HousesScreenState extends State<HousesScreen> {
                         ),
                         value:
                             _houseTypeOptions.isNotEmpty
-                                ? _houseTypeOptions[0]
+                                ? _houseTypeOptions[0]['id'].toString()
                                 : null,
                         items:
-                            _houseTypeOptions.map((String value) {
+                            _houseTypeOptions.map((option) {
                               return DropdownMenuItem<String>(
-                                value: value,
-                                child: Text(value),
+                                value: option['id'].toString(),
+                                child: Text(option['name']),
                               );
                             }).toList(),
                         onChanged: (newValue) {
                           setState(() {
                             category = newValue!;
                           });
+                          print("CATEGORY ID: $newValue");
                         },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -371,6 +365,7 @@ class _HousesScreenState extends State<HousesScreen> {
                           return null;
                         },
                       ),
+
                       SizedBox(height: 16),
 
                       // Price
@@ -394,7 +389,7 @@ class _HousesScreenState extends State<HousesScreen> {
                           return null;
                         },
                         onChanged: (value) {
-                          price = double.tryParse(value) ?? 0.0;
+                          price = int.parse(value);
                         },
                       ),
                       SizedBox(height: 16),
@@ -477,25 +472,526 @@ class _HousesScreenState extends State<HousesScreen> {
                   child: Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (_formKey.currentState!.validate()) {
-                      // Here you would add code to save the new house
-                      // For example, call an API or update your local storage
-
-                      // For demonstration, show a success message
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('New house added successfully!'),
-                          backgroundColor: Colors.green,
-                        ),
+                      await addHouse(
+                        context,
+                        houseNo,
+                        category,
+                        description,
+                        price,
+                        selectedImage,
                       );
-
-                      // You might want to refresh the houses list here
+                      Navigator.of(context).pop();
                       _fetchHouses();
                     }
                   },
                   child: Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showHouseDetailsModal(BuildContext context, Property house) {
+    Links link = Links();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  children: [
+                    Container(
+                      height: 200,
+                      width: double.infinity,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                        ),
+                        child: Image.network(
+                          house.image.startsWith('http')
+                              ? house.image
+                              : '${link.imglink}/${house.image}',
+                          fit: BoxFit.cover,
+                          loadingBuilder:
+                              (context, child, loadingProgress) =>
+                                  (loadingProgress == null)
+                                      ? child
+                                      : Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                          errorBuilder:
+                              (context, error, stackTrace) => Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  size: 50,
+                                ),
+                              ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white.withOpacity(0.7),
+                        child: IconButton(
+                          icon: Icon(Icons.close, color: Colors.black),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: house.isAvailable ? Colors.green : Colors.red,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          house.isAvailable ? 'AVAILABLE' : 'RENTED',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              house.houseNo,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '₱${house.price.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            house.category,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(context).primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Description',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          house.description,
+                          style: TextStyle(fontSize: 16, height: 1.5),
+                        ),
+                        SizedBox(height: 24),
+                        Text(
+                          'Property Details',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        _buildDetailRow('ID', house.id),
+                        _buildDetailRow('House Title', house.houseNo),
+                        _buildDetailRow('Category', house.category),
+                        _buildDetailRow(
+                          'Price',
+                          '₱${house.price.toStringAsFixed(0)}',
+                        ),
+                        _buildDetailRow(
+                          'Status',
+                          house.isAvailable ? 'Available' : 'Rented',
+                        ),
+                        SizedBox(height: 24),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  _showDeleteConfirmationDialog(context, house);
+                                },
+                                child: Text('Delete Property'),
+                                style: OutlinedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  foregroundColor: Colors.red,
+                                  side: BorderSide(color: Colors.red),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, Property house) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Property'),
+          content: Text(
+            'Are you sure you want to delete ${house.houseNo}? This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await deleteHouse(context, house.id);
+                _fetchHouses();
+                Navigator.of(context).pop();
+              },
+              child: Text('Delete'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditHouseModal(BuildContext context, Property house) {
+    final _formKey = GlobalKey<FormState>();
+    String houseNo = house.houseNo;
+    String description = house.description;
+
+    String? category =
+        _houseTypeOptions
+            .firstWhere(
+              (type) => type['name'] == house.category,
+              orElse: () => {'id': null},
+            )['id']
+            ?.toString();
+
+    int price = house.price.toInt();
+    bool isAvailable = house.isAvailable;
+    File? selectedImage;
+    final ImagePicker _picker = ImagePicker();
+    Links link = Links();
+
+    Future<void> _pickImage() async {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        selectedImage = File(image.path);
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Edit House'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        initialValue: houseNo,
+                        decoration: InputDecoration(
+                          labelText: 'House No',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.home),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter house number';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          houseNo = value;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: 'Category',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.category),
+                        ),
+                        value: category,
+                        items:
+                            _houseTypeOptions.map((option) {
+                              return DropdownMenuItem<String>(
+                                value: option['id'].toString(),
+                                child: Text(option['name']),
+                              );
+                            }).toList(),
+                        onChanged: (newValue) {
+                          setState(() {
+                            category = newValue!;
+                          });
+
+                          print("NEW VALUE: $newValue");
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select a category';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      TextFormField(
+                        initialValue: price.toString(),
+                        decoration: InputDecoration(
+                          labelText: 'Price',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.attach_money),
+                          prefixText: '₱ ',
+                        ),
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter price';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          price = int.parse(value);
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      TextFormField(
+                        initialValue: description,
+                        decoration: InputDecoration(
+                          labelText: 'Description',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.description),
+                        ),
+                        maxLines: 3,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter description';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          description = value;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      if (selectedImage == null)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Current Image:',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              height: 150,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  house.image.startsWith('http')
+                                      ? house.image
+                                      : '${link.imglink}/${house.image}',
+                                  fit: BoxFit.cover,
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) =>
+                                          (loadingProgress == null)
+                                              ? child
+                                              : Center(
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              ),
+                                  errorBuilder:
+                                      (context, error, stackTrace) => Center(
+                                        child: Icon(
+                                          Icons.image_not_supported,
+                                          size: 50,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                      if (selectedImage != null)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('New Image:', style: TextStyle(fontSize: 16)),
+                            SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              height: 150,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  selectedImage!,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      SizedBox(height: 16),
+
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          await _pickImage();
+                          setState(() {});
+                        },
+                        icon: Icon(Icons.photo_library),
+                        label: Text('Change Image'),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: Size(double.infinity, 45),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (_formKey.currentState!.validate()) {
+                      await updateHouse(
+                        context,
+                        int.parse(house.id),
+                        houseNo,
+                        category!,
+                        description,
+                        price,
+                        selectedImage,
+                      );
+                      Navigator.of(context).pop();
+                      _fetchHouses();
+                    }
+                  },
+                  child: Text('Update'),
                 ),
               ],
             );
@@ -509,8 +1005,17 @@ class _HousesScreenState extends State<HousesScreen> {
 class HouseCard extends StatelessWidget {
   final Property house;
   final bool isDarkMode;
+  final Function(BuildContext, Property) onViewDetails;
+  final Function(BuildContext, Property) onEdit;
 
-  HouseCard({required this.house, required this.isDarkMode});
+  Links link = Links();
+
+  HouseCard({
+    required this.house,
+    required this.isDarkMode,
+    required this.onViewDetails,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -534,7 +1039,9 @@ class HouseCard extends StatelessWidget {
                   color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
                   child: Center(
                     child: Image.network(
-                      house.image,
+                      house.image.startsWith('http')
+                          ? house.image
+                          : '${link.imglink}/${house.image}',
                       loadingBuilder:
                           (context, child, loadingProgress) =>
                               (loadingProgress == null)
@@ -615,7 +1122,8 @@ class HouseCard extends StatelessWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          // View details action
+                          // Using the callback function now
+                          onViewDetails(context, house);
                         },
                         child: Text('View Details'),
                       ),
@@ -623,7 +1131,7 @@ class HouseCard extends StatelessWidget {
                     SizedBox(width: 10),
                     OutlinedButton(
                       onPressed: () {
-                        // Edit house action
+                        onEdit(context, house);
                       },
                       child: Text('Edit'),
                     ),

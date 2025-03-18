@@ -137,7 +137,8 @@ class PropertyRental
     {
         include("conn.php");
         $data = json_decode($json, true);
-        $imageFileName = null;
+        $imageFileName = $imageFileName ?? 'https://placehold.co/800x600/85c1e9/FFFFFF?font=roboto&text=NO%20IMAGE%20CAPITAL';
+
 
         if (!empty($_FILES['image']['name'])) {
             $targetDir = "uploads/";
@@ -164,9 +165,9 @@ class PropertyRental
         $insert_stmt->bindParam(':image', $imageFileName);
 
         if ($insert_stmt->execute()) {
-            echo json_encode(["success" => "House added successfully"]);
+            echo json_encode("1");
         } else {
-            echo json_encode(["error" => "Failed to add house"]);
+            echo json_encode("0");
         }
     }
 
@@ -175,23 +176,46 @@ class PropertyRental
     {
         include("conn.php");
         $data = json_decode($json, true);
+        $imageFileName = $data['image'] ?? 'https://placehold.co/800x600/85c1e9/FFFFFF?font=roboto&text=NO%20IMAGE%20CAPITAL';
 
-        $update_sql = "UPDATE `houses` SET `house_no` = :house_no, `category_id` = :category_id,
-                        `description` = :description, `price` = :price, `image` = :image WHERE `id` = :id";
+        if (!empty($_FILES['image']['name'])) {
+            $targetDir = "uploads/";
+            $imageFileName = basename($_FILES['image']['name']);
+            $targetFilePath = $targetDir . $imageFileName;
+
+            if (!is_dir($targetDir)) {
+                mkdir($targetDir, 0777, true);
+            }
+
+            if (!move_uploaded_file($_FILES['image']['tmp_name'], $targetFilePath)) {
+                echo json_encode(["error" => "Failed to upload image"]);
+                return;
+            }
+        }
+
+        $update_sql = "UPDATE `houses` 
+                       SET `house_no` = :house_no, 
+                           `category_id` = :category_id,
+                           `description` = :description, 
+                           `price` = :price, 
+                           `image` = :image 
+                       WHERE `id` = :id";
+
         $update_stmt = $conn->prepare($update_sql);
         $update_stmt->bindParam(':id', $data['id']);
         $update_stmt->bindParam(':house_no', $data['house_no']);
         $update_stmt->bindParam(':category_id', $data['category_id']);
         $update_stmt->bindParam(':description', $data['description']);
         $update_stmt->bindParam(':price', $data['price']);
-        $update_stmt->bindParam(':image', $data['image']);
+        $update_stmt->bindParam(':image', $imageFileName);
 
         if ($update_stmt->execute()) {
-            echo json_encode(["success" => "House updated successfully"]);
+            echo json_encode("1");
         } else {
-            echo json_encode(["error" => "Failed to update house"]);
+            echo json_encode("0");
         }
     }
+
 
     function deleteHouse($json)
     {
@@ -203,9 +227,9 @@ class PropertyRental
         $delete_stmt->bindParam(':id', $data['id']);
 
         if ($delete_stmt->execute()) {
-            echo json_encode(["success" => "House deleted successfully"]);
+            echo json_encode("1");
         } else {
-            echo json_encode(["error" => "Failed to delete house"]);
+            echo json_encode("0");
         }
     }
 
