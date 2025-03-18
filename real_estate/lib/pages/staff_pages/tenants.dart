@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:real_estate/models/tenant.dart';
-import 'package:real_estate/pages/admin_pages/dashboard.dart';
-import 'package:real_estate/pages/admin_pages/houses.dart';
-import 'package:real_estate/pages/admin_pages/house_types.dart';
-import 'package:real_estate/pages/admin_pages/payments.dart';
-import 'package:real_estate/pages/admin_pages/reports.dart';
-import 'package:real_estate/pages/admin_pages/users.dart';
+import 'package:real_estate/pages/staff_pages/dashboard.dart';
+import 'package:real_estate/pages/staff_pages/houses.dart';
+import 'package:real_estate/pages/staff_pages/house_types.dart';
+import 'package:real_estate/pages/staff_pages/payments.dart';
+import 'package:real_estate/pages/staff_pages/reports.dart';
 import 'package:real_estate/pages/login_page.dart';
 
-class TenantScreen extends StatefulWidget {
+class StaffTenantScreen extends StatefulWidget {
   final Function toggleTheme;
   final bool isDarkMode;
 
-  TenantScreen({required this.toggleTheme, required this.isDarkMode});
+  StaffTenantScreen({required this.toggleTheme, required this.isDarkMode});
 
   @override
-  _TenantScreenState createState() => _TenantScreenState();
+  _StaffTenantScreenState createState() => _StaffTenantScreenState();
 }
 
-class _TenantScreenState extends State<TenantScreen> {
+class _StaffTenantScreenState extends State<StaffTenantScreen> {
   final List<Tenant> _tenants = [
     Tenant(
       id: '1',
@@ -52,7 +51,7 @@ class _TenantScreenState extends State<TenantScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Tenants'),
+        title: Text('Staff Tenants'),
         actions: [
           IconButton(
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
@@ -87,11 +86,11 @@ class _TenantScreenState extends State<TenantScreen> {
                   ),
                   SizedBox(height: 10),
                   Text(
-                    'John Smith',
+                    'Staff Member',
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                   Text(
-                    'john.smith@example.com',
+                    'staff@example.com',
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
@@ -105,7 +104,7 @@ class _TenantScreenState extends State<TenantScreen> {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder:
-                        (context) => DashboardScreen(
+                        (context) => StaffDashboardScreen(
                           toggleTheme: widget.toggleTheme,
                           isDarkMode: widget.isDarkMode,
                         ),
@@ -121,7 +120,7 @@ class _TenantScreenState extends State<TenantScreen> {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder:
-                        (context) => HouseTypesScreen(
+                        (context) => StaffHouseTypesScreen(
                           toggleTheme: widget.toggleTheme,
                           isDarkMode: widget.isDarkMode,
                         ),
@@ -137,7 +136,7 @@ class _TenantScreenState extends State<TenantScreen> {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder:
-                        (context) => HousesScreen(
+                        (context) => StaffHousesScreen(
                           toggleTheme: widget.toggleTheme,
                           isDarkMode: widget.isDarkMode,
                         ),
@@ -160,7 +159,7 @@ class _TenantScreenState extends State<TenantScreen> {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder:
-                        (context) => PaymentsScreen(
+                        (context) => StaffPaymentsScreen(
                           toggleTheme: widget.toggleTheme,
                           isDarkMode: widget.isDarkMode,
                         ),
@@ -176,7 +175,7 @@ class _TenantScreenState extends State<TenantScreen> {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder:
-                        (context) => ReportsScreen(
+                        (context) => StaffReportsScreen(
                           toggleTheme: widget.toggleTheme,
                           isDarkMode: widget.isDarkMode,
                         ),
@@ -184,22 +183,7 @@ class _TenantScreenState extends State<TenantScreen> {
                 );
               },
             ),
-            ListTile(
-              leading: Icon(Icons.people),
-              title: Text('Users'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder:
-                        (context) => UsersScreen(
-                          toggleTheme: widget.toggleTheme,
-                          isDarkMode: widget.isDarkMode,
-                        ),
-                  ),
-                );
-              },
-            ),
+
             Divider(),
             ListTile(
               leading: Icon(Icons.exit_to_app),

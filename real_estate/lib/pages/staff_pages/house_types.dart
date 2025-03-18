@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:real_estate/models/house_types.dart';
-import 'package:real_estate/pages/admin_pages/dashboard.dart';
-import 'package:real_estate/pages/admin_pages/houses.dart';
-import 'package:real_estate/pages/admin_pages/payments.dart';
-import 'package:real_estate/pages/admin_pages/reports.dart';
-import 'package:real_estate/pages/admin_pages/users.dart';
+import 'package:real_estate/pages/staff_pages/dashboard.dart';
+import 'package:real_estate/pages/staff_pages/houses.dart';
+import 'package:real_estate/pages/staff_pages/payments.dart';
+import 'package:real_estate/pages/staff_pages/reports.dart';
+import 'package:real_estate/pages/staff_pages/tenants.dart';
 
-class HouseTypesScreen extends StatefulWidget {
+class StaffHouseTypesScreen extends StatefulWidget {
   final Function toggleTheme;
   final bool isDarkMode;
 
-  HouseTypesScreen({required this.toggleTheme, required this.isDarkMode});
+  StaffHouseTypesScreen({required this.toggleTheme, required this.isDarkMode});
 
   @override
-  _HouseTypesScreenState createState() => _HouseTypesScreenState();
+  _StaffHouseTypesScreenState createState() => _StaffHouseTypesScreenState();
 }
 
-class _HouseTypesScreenState extends State<HouseTypesScreen> {
+class _StaffHouseTypesScreenState extends State<StaffHouseTypesScreen> {
   final List<HouseType> _houseTypes = [
     HouseType(
       id: '1',
@@ -59,7 +59,7 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('House Types'),
+        title: Text('Staff House Types'),
         actions: [
           IconButton(
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
@@ -216,32 +216,32 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'John Smith',
+                  'Staff User',
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 Text(
-                  'john.smith@example.com',
+                  'staff@example.com',
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
             ),
           ),
-           ListTile(
-              leading: Icon(Icons.dashboard),
-              title: Text('Dashboard'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder:
-                        (context) => DashboardScreen(
-                          toggleTheme: widget.toggleTheme,
-                          isDarkMode: widget.isDarkMode,
-                        ),
-                  ),
-                );
-              },
-            ),
+          ListTile(
+            leading: Icon(Icons.dashboard),
+            title: Text('Dashboard'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder:
+                      (context) => StaffDashboardScreen(
+                        toggleTheme: widget.toggleTheme,
+                        isDarkMode: widget.isDarkMode,
+                      ),
+                ),
+              );
+            },
+          ),
 
           ListTile(
             leading: Icon(Icons.category),
@@ -260,7 +260,7 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder:
-                      (context) => HousesScreen(
+                      (context) => StaffHousesScreen(
                         toggleTheme: widget.toggleTheme,
                         isDarkMode: widget.isDarkMode,
                       ),
@@ -273,33 +273,10 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
             title: Text('Tenants'),
             onTap: () {
               Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.payment),
-            title: Text('Payments'),
-            onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder:
-                        (context) => PaymentsScreen(
-                          toggleTheme: widget.toggleTheme,
-                          isDarkMode: widget.isDarkMode,
-                        ),
-                  ),
-                );
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.data_exploration_rounded),
-            title: Text('Reports'),
-            onTap: () {
-              Navigator.pop(context);
-               Navigator.of(context).pushReplacement(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder:
-                      (context) => ReportsScreen(
+                      (context) => StaffTenantScreen(
                         toggleTheme: widget.toggleTheme,
                         isDarkMode: widget.isDarkMode,
                       ),
@@ -308,14 +285,30 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
             },
           ),
           ListTile(
-            leading: Icon(Icons.people),
-            title: Text('Users'),
+            leading: Icon(Icons.payment),
+            title: Text('Payments'),
             onTap: () {
               Navigator.pop(context);
-               Navigator.of(context).pushReplacement(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder:
-                      (context) => UsersScreen(
+                      (context) => StaffPaymentsScreen(
+                        toggleTheme: widget.toggleTheme,
+                        isDarkMode: widget.isDarkMode,
+                      ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.data_exploration_rounded),
+            title: Text('Reports'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder:
+                      (context) => StaffReportsScreen(
                         toggleTheme: widget.toggleTheme,
                         isDarkMode: widget.isDarkMode,
                       ),
