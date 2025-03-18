@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:real_estate/pages/admin_pages/houses.dart';
+import 'package:real_estate/pages/admin_pages/dashboard.dart';
 import 'package:real_estate/pages/staff_pages/dashboard.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:real_estate/util/links.dart';
 
 class LoginScreen extends StatefulWidget {
   final Function toggleTheme;
@@ -43,7 +47,8 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  void _login() {
+  void _login() async {
+    Links links = Links();
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -54,28 +59,81 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
-    // Simulate API call
-    Future.delayed(Duration(seconds: 2), () {
-      setState(() {
-        _isLoading = false;
-      });
+    try {
+      final jsonData = {
+        "username": _emailController.text,
+        "password": _passwordController.text,
+      };
 
-      // Navigate to home page
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => StaffDashboardScreen(
-                toggleTheme: widget.toggleTheme,
-                isDarkMode: widget.isDarkMode,
-              ),
+      final query = {"operation": "login", "json": jsonEncode(jsonData)};
+      final response = await http.get(
+        Uri.parse(links.login_link).replace(queryParameters: query),
+      );
+
+      var result = jsonDecode(response.body);
+
+      if (result == "0") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Invalid credentials. Please try again."),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        // Store data in Hive
+        final box = Hive.box('myBox');
+        box.put('id', result['id']);
+        box.put('name', result['name']);
+        box.put('username', result['username']);
+        box.put('type', result['type']);
+
+        // Navigate based on user type
+        if (result['type'] == 1) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => DashboardScreen(
+                    toggleTheme: widget.toggleTheme,
+                    isDarkMode: widget.isDarkMode,
+                  ),
+            ),
+          );
+        } else if (result['type'] == 2) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => StaffDashboardScreen(
+                    toggleTheme: widget.toggleTheme,
+                    isDarkMode: widget.isDarkMode,
+                  ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Unknown user type."),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      print('Error: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("An error occurred. Please try again later."),
+          backgroundColor: Colors.red,
         ),
       );
-    });
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -182,13 +240,6 @@ class _LoginScreenState extends State<LoginScreen>
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {},
-                        child: Text('Forgot Password?'),
                       ),
                     ),
                     SizedBox(height: 20),

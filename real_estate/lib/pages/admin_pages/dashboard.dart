@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:real_estate/data/admin/getDashboardData.dart';
 import 'package:real_estate/pages/admin_pages/house_types.dart';
 import 'package:real_estate/pages/admin_pages/houses.dart';
 import 'package:real_estate/pages/admin_pages/payments.dart';
@@ -18,9 +19,29 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final int totalHouses = 24;
-  final int totalTenants = 18;
-  final double paymentsThisMonth = 45600.00;
+  int totalHouses = 0;
+  int totalTenants = 0;
+  double paymentsThisMonth = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchDashboardData();
+  }
+
+  Future<void> fetchDashboardData() async {
+    final data = await getDashboardData();
+
+    if (data != null) {
+      setState(() {
+        totalHouses = data['house_count'] ?? 0;
+        totalTenants = data['tenant_count'] ?? 0;
+        paymentsThisMonth = (data['payments_this_month'] ?? 0.0).toDouble();
+      });
+    } else {
+      print("Failed to fetch dashboard data.");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,13 +96,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
               ),
-              SizedBox(height: 24),
-              Text(
-                'Recent Activity',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 16),
-              _buildRecentActivityList(),
+              // SizedBox(height: 24),
+              // Text(
+              //   'Recent Activity',
+              //   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              // ),
+              // SizedBox(height: 16),
+              // _buildRecentActivityList(),
             ],
           ),
         ),
@@ -314,7 +335,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: Text('Users'),
             onTap: () {
               Navigator.pop(context);
-               Navigator.of(context).pushReplacement(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder:
                       (context) => UsersScreen(

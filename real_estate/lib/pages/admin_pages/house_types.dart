@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:real_estate/data/admin/houseTypes.dart';
 import 'package:real_estate/models/house_types.dart';
 import 'package:real_estate/pages/admin_pages/dashboard.dart';
 import 'package:real_estate/pages/admin_pages/houses.dart';
@@ -17,43 +18,28 @@ class HouseTypesScreen extends StatefulWidget {
 }
 
 class _HouseTypesScreenState extends State<HouseTypesScreen> {
-  final List<HouseType> _houseTypes = [
-    HouseType(
-      id: '1',
-      name: 'Studio',
-      description: 'Single room with integrated kitchen and bathroom',
-      basePrice: 150000,
-      isActive: true,
-    ),
-    HouseType(
-      id: '2',
-      name: 'Apartment',
-      description: 'Multi-room unit in a building complex',
-      basePrice: 350000,
-      isActive: true,
-    ),
-    HouseType(
-      id: '3',
-      name: 'Townhouse',
-      description: 'Multi-story house connected to other similar units',
-      basePrice: 450000,
-      isActive: true,
-    ),
-    HouseType(
-      id: '4',
-      name: 'Bungalow',
-      description: 'Single-story house with a sloping roof',
-      basePrice: 550000,
-      isActive: false,
-    ),
-    HouseType(
-      id: '5',
-      name: 'Villa',
-      description: 'Luxury house with large yard and pool',
-      basePrice: 750000,
-      isActive: true,
-    ),
-  ];
+  List<HouseType> _houseTypes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchHouseTypes();
+  }
+
+  Future<void> fetchHouseTypes() async {
+    final data = await getHouseTypes();
+
+    if (data != null) {
+      setState(() {
+        _houseTypes =
+            data.map<HouseType>((item) {
+              return HouseType(id: item['id'].toString(), name: item['name']);
+            }).toList();
+      });
+    } else {
+      print("Failed to fetch house types.");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,46 +104,9 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color:
-                            houseType.isActive
-                                ? Colors.green[100]
-                                : Colors.red[100],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: houseType.isActive ? Colors.green : Colors.red,
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        houseType.isActive ? 'Active' : 'Inactive',
-                        style: TextStyle(
-                          color:
-                              houseType.isActive
-                                  ? Colors.green[800]
-                                  : Colors.red[800],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
-                SizedBox(height: 8),
-                Text(
-                  houseType.description,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Base Price: ₱${houseType.basePrice.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                ),
+
                 SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -226,22 +175,22 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
               ],
             ),
           ),
-           ListTile(
-              leading: Icon(Icons.dashboard),
-              title: Text('Dashboard'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder:
-                        (context) => DashboardScreen(
-                          toggleTheme: widget.toggleTheme,
-                          isDarkMode: widget.isDarkMode,
-                        ),
-                  ),
-                );
-              },
-            ),
+          ListTile(
+            leading: Icon(Icons.dashboard),
+            title: Text('Dashboard'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder:
+                      (context) => DashboardScreen(
+                        toggleTheme: widget.toggleTheme,
+                        isDarkMode: widget.isDarkMode,
+                      ),
+                ),
+              );
+            },
+          ),
 
           ListTile(
             leading: Icon(Icons.category),
@@ -279,16 +228,16 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
             leading: Icon(Icons.payment),
             title: Text('Payments'),
             onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder:
-                        (context) => PaymentsScreen(
-                          toggleTheme: widget.toggleTheme,
-                          isDarkMode: widget.isDarkMode,
-                        ),
-                  ),
-                );
+              Navigator.pop(context);
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder:
+                      (context) => PaymentsScreen(
+                        toggleTheme: widget.toggleTheme,
+                        isDarkMode: widget.isDarkMode,
+                      ),
+                ),
+              );
             },
           ),
           ListTile(
@@ -296,7 +245,7 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
             title: Text('Reports'),
             onTap: () {
               Navigator.pop(context);
-               Navigator.of(context).pushReplacement(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder:
                       (context) => ReportsScreen(
@@ -312,7 +261,7 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
             title: Text('Users'),
             onTap: () {
               Navigator.pop(context);
-               Navigator.of(context).pushReplacement(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder:
                       (context) => UsersScreen(
@@ -345,13 +294,6 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
     final nameController = TextEditingController(
       text: isEditing ? houseType.name : '',
     );
-    final descriptionController = TextEditingController(
-      text: isEditing ? houseType.description : '',
-    );
-    final priceController = TextEditingController(
-      text: isEditing ? houseType.basePrice.toString() : '',
-    );
-    bool isActive = isEditing ? houseType.isActive : true;
 
     return showDialog(
       context: context,
@@ -374,34 +316,6 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
                           ),
                         ),
                         SizedBox(height: 16),
-                        TextField(
-                          controller: descriptionController,
-                          decoration: InputDecoration(
-                            labelText: 'Description',
-                            border: OutlineInputBorder(),
-                          ),
-                          maxLines: 3,
-                        ),
-                        SizedBox(height: 16),
-                        TextField(
-                          controller: priceController,
-                          decoration: InputDecoration(
-                            labelText: 'Base Price (₱)',
-                            border: OutlineInputBorder(),
-                            prefixText: '₱',
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                        SizedBox(height: 16),
-                        SwitchListTile(
-                          title: Text('Active'),
-                          value: isActive,
-                          onChanged: (value) {
-                            setState(() {
-                              isActive = value;
-                            });
-                          },
-                        ),
                       ],
                     ),
                   ),
