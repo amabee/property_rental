@@ -44,6 +44,27 @@ class PropertyRental
 
     #region Categories
 
+    function createCategory($json)
+    {
+        include("conn.php");
+        $data = json_decode($json, true);
+
+        if (!isset($data['name'])) {
+            echo json_encode(["error" => "Missing category name"]);
+            return;
+        }
+
+        $insert_sql = "INSERT INTO `categories` (`name`) VALUES (:name)";
+        $insert_stmt = $conn->prepare($insert_sql);
+        $insert_stmt->bindParam(':name', $data['name']);
+
+        if ($insert_stmt->execute()) {
+            echo json_encode(["success" => "Category created successfully"]);
+        } else {
+            echo json_encode(["error" => "Failed to create category"]);
+        }
+    }
+
     function getCategories()
     {
         include("conn.php");
@@ -104,7 +125,8 @@ class PropertyRental
     function getHouses()
     {
         include("conn.php");
-        $select_sql = "SELECT `id`, `house_no`, `category_id`, `description`, `price`, `image` FROM `houses` WHERE 1";
+        $select_sql = "SELECT houses.*, categories.name AS category_name
+         FROM `houses` JOIN categories ON houses.category_id = categories.id";
         $select_stmt = $conn->prepare($select_sql);
         $select_stmt->execute();
         $row = $select_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -115,6 +137,22 @@ class PropertyRental
     {
         include("conn.php");
         $data = json_decode($json, true);
+        $imageFileName = null;
+
+        if (!empty($_FILES['image']['name'])) {
+            $targetDir = "uploads/";
+            $imageFileName = basename($_FILES['image']['name']);
+            $targetFilePath = $targetDir . $imageFileName;
+
+            if (!is_dir($targetDir)) {
+                mkdir($targetDir, 0777, true);
+            }
+
+            if (!move_uploaded_file($_FILES['image']['tmp_name'], $targetFilePath)) {
+                echo json_encode(["error" => "Failed to upload image"]);
+                return;
+            }
+        }
 
         $insert_sql = "INSERT INTO `houses` (`house_no`, `category_id`, `description`, `price`, `image`) 
                        VALUES (:house_no, :category_id, :description, :price, :image)";
@@ -123,7 +161,7 @@ class PropertyRental
         $insert_stmt->bindParam(':category_id', $data['category_id']);
         $insert_stmt->bindParam(':description', $data['description']);
         $insert_stmt->bindParam(':price', $data['price']);
-        $insert_stmt->bindParam(':image', $data['image']);
+        $insert_stmt->bindParam(':image', $imageFileName);
 
         if ($insert_stmt->execute()) {
             echo json_encode(["success" => "House added successfully"]);
@@ -131,6 +169,7 @@ class PropertyRental
             echo json_encode(["error" => "Failed to add house"]);
         }
     }
+
 
     function updateHouse($json)
     {
@@ -186,6 +225,9 @@ if ($_SERVER["REQUEST_METHOD"] == "GET" || $_SERVER["REQUEST_METHOD"] == "POST")
                 break;
             case 'getCategories':
                 $api->getCategories();
+                break;
+            case 'createCategory':
+                $api->createCategory($json);
                 break;
             case 'updateCategory':
                 $api->updateCategory($json);

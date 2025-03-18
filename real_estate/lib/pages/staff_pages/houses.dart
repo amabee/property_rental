@@ -19,30 +19,7 @@ class StaffHousesScreen extends StatefulWidget {
 }
 
 class _StaffHousesScreenState extends State<StaffHousesScreen> {
-  final List<Property> _houses = [
-    Property(
-      id: '1',
-      title: 'Modern Villa with Pool',
-      address: '123 Main St, Cityville',
-      price: 750000,
-      bedrooms: 4,
-      bathrooms: 3,
-      area: 2500,
-      imageUrl: 'https://via.placeholder.com/300',
-      isAvailable: true,
-    ),
-    Property(
-      id: '2',
-      title: 'Downtown Apartment',
-      address: '456 Center Ave, Metropolis',
-      price: 350000,
-      bedrooms: 2,
-      bathrooms: 2,
-      area: 1200,
-      imageUrl: 'https://via.placeholder.com/300',
-      isAvailable: false,
-    ),
-  ];
+  final List<Property> _houses = [];
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +274,7 @@ class HouseCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        house.title,
+                        house.houseNo,
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -323,7 +300,7 @@ class HouseCard extends StatelessWidget {
                     SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        house.address,
+                        house.description,
                         style: TextStyle(color: Colors.grey),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

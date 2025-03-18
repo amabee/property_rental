@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:real_estate/data/admin/houseTypes.dart';
+import 'package:real_estate/data/admin/houses.dart';
 import 'package:real_estate/models/propert.dart';
 import 'package:real_estate/pages/admin_pages/dashboard.dart';
 import 'package:real_estate/pages/admin_pages/house_types.dart';
@@ -7,6 +9,8 @@ import 'package:real_estate/pages/admin_pages/reports.dart';
 import 'package:real_estate/pages/admin_pages/tenants.dart';
 import 'package:real_estate/pages/admin_pages/users.dart';
 import 'package:real_estate/pages/login_page.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class HousesScreen extends StatefulWidget {
   final Function toggleTheme;
@@ -19,30 +23,65 @@ class HousesScreen extends StatefulWidget {
 }
 
 class _HousesScreenState extends State<HousesScreen> {
-  final List<Property> _houses = [
-    Property(
-      id: '1',
-      title: 'Modern Villa with Pool',
-      address: '123 Main St, Cityville',
-      price: 750000,
-      bedrooms: 4,
-      bathrooms: 3,
-      area: 2500,
-      imageUrl: 'https://via.placeholder.com/300',
-      isAvailable: true,
-    ),
-    Property(
-      id: '2',
-      title: 'Downtown Apartment',
-      address: '456 Center Ave, Metropolis',
-      price: 350000,
-      bedrooms: 2,
-      bathrooms: 2,
-      area: 1200,
-      imageUrl: 'https://via.placeholder.com/300',
-      isAvailable: false,
-    ),
-  ];
+  List<Property> _houses = [];
+  List<String> _houseTypeOptions = [];
+
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHouses();
+    _fetchHouseTypes();
+  }
+
+  Future<void> _fetchHouses() async {
+    final houseData = await getHouses();
+
+    if (houseData != null) {
+      setState(() {
+        _houses =
+            houseData
+                .map(
+                  (house) => Property(
+                    id: house['id'].toString(),
+                    houseNo: house['house_no'].toString(),
+                    category: house['category_name'].toString(),
+                    description: house['description'].toString(),
+                    image: house['image'].toString(),
+                    price: house['price'] ?? 0.00,
+                    isAvailable: house['isAvailable'] ?? true,
+                  ),
+                )
+                .toList();
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load houses.')));
+    }
+  }
+
+  Future<void> _fetchHouseTypes() async {
+    final houseTypesData = await getHouseTypes();
+
+    if (houseTypesData != null) {
+      setState(() {
+        _houseTypeOptions =
+            houseTypesData
+                .map<String>(
+                  (type) => type['name'].toString(),
+                ) // Assuming API returns {'id': 1, 'name': 'Apartment'}
+                .toList();
+      });
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load house types.')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,10 +98,7 @@ class _HousesScreenState extends State<HousesScreen> {
       body: _buildHousesList(_houses),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Add new house action
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Add new house')));
+          _showAddHouseModal(context);
         },
         child: Icon(Icons.add),
       ),
@@ -243,9 +279,233 @@ class _HousesScreenState extends State<HousesScreen> {
           },
         );
   }
+
+  void _showAddHouseModal(BuildContext context) {
+    final _formKey = GlobalKey<FormState>();
+    String houseNo = '';
+    String description = '';
+    String category = '';
+    double price = 0.0;
+    File? selectedImage;
+    final ImagePicker _picker = ImagePicker();
+
+    // Create a list of categories to choose from
+    final List<String> categories = [
+      'Apartment',
+      'House',
+      'Condo',
+      'Studio',
+      'Penthouse',
+    ];
+
+    // Default selection
+    category = categories[0];
+
+    Future<void> _pickImage() async {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          selectedImage = File(image.path);
+        });
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Add New House'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // House Number
+                      TextFormField(
+                        decoration: InputDecoration(
+                          labelText: 'House No',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.home),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter house number';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          houseNo = value;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: 'Category',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.category),
+                        ),
+                        value:
+                            _houseTypeOptions.isNotEmpty
+                                ? _houseTypeOptions[0]
+                                : null,
+                        items:
+                            _houseTypeOptions.map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value),
+                              );
+                            }).toList(),
+                        onChanged: (newValue) {
+                          setState(() {
+                            category = newValue!;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select a category';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      // Price
+                      TextFormField(
+                        decoration: InputDecoration(
+                          labelText: 'Price',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.attach_money),
+                          prefixText: '₱ ',
+                        ),
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter price';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          price = double.tryParse(value) ?? 0.0;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      // Description
+                      TextFormField(
+                        decoration: InputDecoration(
+                          labelText: 'Description',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.description),
+                        ),
+                        maxLines: 3,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter description';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          description = value;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      // Image Selection
+                      Container(
+                        width: double.infinity,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child:
+                            selectedImage != null
+                                ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(
+                                    selectedImage!,
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                                : Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.image,
+                                        size: 50,
+                                        color: Colors.grey,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text('No image selected'),
+                                    ],
+                                  ),
+                                ),
+                      ),
+                      SizedBox(height: 8),
+
+                      // Image picker button
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          await _pickImage();
+                          setState(() {});
+                        },
+                        icon: Icon(Icons.photo_library),
+                        label: Text('Select Image'),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: Size(double.infinity, 45),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      // Here you would add code to save the new house
+                      // For example, call an API or update your local storage
+
+                      // For demonstration, show a success message
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('New house added successfully!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+
+                      // You might want to refresh the houses list here
+                      _fetchHouses();
+                    }
+                  },
+                  child: Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
-// House Card Widget
 class HouseCard extends StatelessWidget {
   final Property house;
   final bool isDarkMode;
@@ -273,10 +533,16 @@ class HouseCard extends StatelessWidget {
                   width: double.infinity,
                   color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
                   child: Center(
-                    child: Icon(
-                      Icons.home,
-                      size: 80,
-                      color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                    child: Image.network(
+                      house.image,
+                      loadingBuilder:
+                          (context, child, loadingProgress) =>
+                              (loadingProgress == null)
+                                  ? child
+                                  : CircularProgressIndicator(),
+                      errorBuilder:
+                          (context, error, stackTrace) =>
+                              Icon(Icons.image_not_supported),
                     ),
                   ),
                 ),
@@ -310,16 +576,28 @@ class HouseCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: Text(
-                        house.title,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          house.houseNo,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        Text(
+                          house.category,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                     Text(
                       '₱${house.price.toStringAsFixed(0)}',
@@ -332,21 +610,6 @@ class HouseCard extends StatelessWidget {
                   ],
                 ),
                 SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.location_on, size: 16, color: Colors.grey),
-                    SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        house.address,
-                        style: TextStyle(color: Colors.grey),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(

@@ -326,17 +326,25 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
                     ),
                     ElevatedButton(
                       child: Text(isEditing ? 'Update' : 'Add'),
-                      onPressed: () {
-                        // In a real app, validate inputs and save to database
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isEditing
-                                  ? 'House type updated!'
-                                  : 'New house type added!',
-                            ),
-                          ),
-                        );
+                      onPressed: () async {
+                        try {
+                          if (isEditing) {
+                            await updateCategory(
+                              context,
+                              houseType.id,
+                              nameController.text,
+                            );
+                          } else {
+                            await addCategory(context, nameController.text);
+                          }
+                        } catch (error) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Something went wrong!')),
+                          );
+                        } finally {
+                          await fetchHouseTypes();
+                        }
+
                         Navigator.of(context).pop();
                       },
                     ),
@@ -366,11 +374,9 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
               ElevatedButton(
                 child: Text('Delete'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: () {
-                  // In a real app, delete from database
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('House type deleted!')),
-                  );
+                onPressed: () async {
+                  await deleteCategory(context, houseType.id);
+                  await fetchHouseTypes();
                   Navigator.of(context).pop();
                 },
               ),
