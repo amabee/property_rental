@@ -18,34 +18,7 @@ class StaffTenantScreen extends StatefulWidget {
 }
 
 class _StaffTenantScreenState extends State<StaffTenantScreen> {
-  final List<Tenant> _tenants = [
-    Tenant(
-      id: '1',
-      name: 'Sarah Johnson',
-      email: 'sarah.johnson@example.com',
-      phone: '+1 (555) 123-4567',
-      propertyId: '1',
-      propertyName: 'Modern Villa with Pool',
-      leaseStart: DateTime(2023, 5, 1),
-      leaseEnd: DateTime(2024, 5, 1),
-      monthlyRent: 3500,
-      depositPaid: true,
-      paymentStatus: 'Current',
-    ),
-    Tenant(
-      id: '2',
-      name: 'Michael Chen',
-      email: 'michael.chen@example.com',
-      phone: '+1 (555) 987-6543',
-      propertyId: '2',
-      propertyName: 'Downtown Apartment',
-      leaseStart: DateTime(2023, 3, 15),
-      leaseEnd: DateTime(2024, 3, 15),
-      monthlyRent: 2200,
-      depositPaid: true,
-      paymentStatus: 'Late',
-    ),
-  ];
+  final List<Tenant> _tenants = [];
 
   @override
   Widget build(BuildContext context) {
@@ -366,14 +339,14 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
             ElevatedButton(
               onPressed: () {
                 // Update tenant logic here
-                setState(() {
-                  tenant.name = nameController.text;
-                  tenant.email = emailController.text;
-                  tenant.phone = phoneController.text;
-                  tenant.monthlyRent = double.parse(rentController.text);
-                  tenant.paymentStatus = paymentStatus;
-                  tenant.depositPaid = depositPaid;
-                });
+                // setState(() {
+                //   tenant.name = nameController.text;
+                //   tenant.email = emailController.text;
+                //   tenant.phone = phoneController.text;
+                //   tenant.monthlyRent = double.parse(rentController.text);
+                //   tenant.paymentStatus = paymentStatus;
+                //   tenant.depositPaid = depositPaid;
+                // });
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Tenant updated successfully')),
@@ -493,23 +466,23 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
             ElevatedButton(
               onPressed: () {
                 // Add new tenant logic
-                setState(() {
-                  _tenants.add(
-                    Tenant(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: nameController.text,
-                      email: emailController.text,
-                      phone: phoneController.text,
-                      propertyId: '3',
-                      propertyName: propertyController.text,
-                      leaseStart: DateTime.now(),
-                      leaseEnd: DateTime.now().add(Duration(days: 365)),
-                      monthlyRent: double.tryParse(rentController.text) ?? 0,
-                      depositPaid: depositPaid,
-                      paymentStatus: paymentStatus,
-                    ),
-                  );
-                });
+                // setState(() {
+                //   _tenants.add(
+                //     Tenant(
+                //       id: DateTime.now().millisecondsSinceEpoch.toString(),
+                //       name: nameController.text,
+                //       email: emailController.text,
+                //       phone: phoneController.text,
+                //       propertyId: '3',
+                //       propertyName: propertyController.text,
+                //       leaseStart: DateTime.now(),
+                //       leaseEnd: DateTime.now().add(Duration(days: 365)),
+                //       monthlyRent: double.tryParse(rentController.text) ?? 0,
+                //       depositPaid: depositPaid,
+                //       paymentStatus: paymentStatus,
+                //     ),
+                //   );
+                // });
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Tenant added successfully')),

@@ -4,7 +4,7 @@ class Payment {
   final DateTime date;
   final String tenantName;
   final String invoiceNumber;
-  final double amount;
+  final int amount;
 
   Payment({
     required this.id,

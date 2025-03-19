@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:real_estate/data/admin/payments.dart';
 import 'package:real_estate/pages/admin_pages/dashboard.dart';
 import 'package:real_estate/pages/admin_pages/house_types.dart';
 import 'package:real_estate/pages/admin_pages/houses.dart';
@@ -37,52 +38,63 @@ class PaymentsScreen extends StatefulWidget {
 }
 
 class _PaymentsScreenState extends State<PaymentsScreen> {
-  // Sample payment data
-  final List<Payment> _payments = [
-    Payment(
-      id: '1',
-      date: DateTime(2025, 3, 15),
-      tenantName: 'Maria Garcia',
-      invoiceNumber: 'INV-2025-001',
-      amount: 12500.00,
-    ),
-    Payment(
-      id: '2',
-      date: DateTime(2025, 3, 10),
-      tenantName: 'James Wilson',
-      invoiceNumber: 'INV-2025-002',
-      amount: 8500.00,
-    ),
-    Payment(
-      id: '3',
-      date: DateTime(2025, 3, 5),
-      tenantName: 'Sarah Johnson',
-      invoiceNumber: 'INV-2025-003',
-      amount: 15000.00,
-    ),
-    Payment(
-      id: '4',
-      date: DateTime(2025, 2, 28),
-      tenantName: 'Robert Lee',
-      invoiceNumber: 'INV-2025-004',
-      amount: 9200.00,
-    ),
-    Payment(
-      id: '5',
-      date: DateTime(2025, 2, 20),
-      tenantName: 'Emily Wong',
-      invoiceNumber: 'INV-2025-005',
-      amount: 10800.00,
-    ),
-  ];
-
-  String _searchQuery = '';
+  List<Payment> _payments = [];
   List<Payment> _filteredPayments = [];
+  String _searchQuery = '';
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _filteredPayments = List.from(_payments);
+    _fetchPayments();
+  }
+
+  Future<void> _fetchPayments() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final paymentsData = await getPayments();
+
+      if (paymentsData != null) {
+        setState(() {
+          _payments =
+              paymentsData
+                  .map(
+                    (data) => Payment(
+                      id: data['id'].toString(),
+                      date: DateTime.parse(
+                        data['date_created'],
+                      ),
+                      tenantName:
+                          data['firstname'] +
+                          ' ' +
+                          data['middlename'] +
+                          ' ' +
+                          data['lastname'],
+                      invoiceNumber: data['invoice'],
+                      amount: data['amount'].toDouble(),
+                    ),
+                  )
+                  .toList();
+          _filteredPayments = List.from(_payments);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = 'Unable to load payments';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Error loading payments: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   void _filterPayments(String query) {
@@ -205,8 +217,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   }
 
   void _editPayment(Payment payment) {
-    // Here you would navigate to an edit form or show a modal
-    // For now, just show a snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Edit payment: ${payment.invoiceNumber}')),
     );
@@ -227,12 +237,14 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
               child: Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
+
                 setState(() {
                   _payments.removeWhere((item) => item.id == payment.id);
                   _filteredPayments = List.from(_payments);
                 });
+
                 ScaffoldMessenger.of(
                   context,
                 ).showSnackBar(SnackBar(content: Text('Payment deleted')));
@@ -279,7 +291,29 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           ),
           Expanded(
             child:
-                _filteredPayments.isEmpty
+                _isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : _error != null
+                    ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 60,
+                            color: Colors.red,
+                          ),
+                          SizedBox(height: 16),
+                          Text(_error!, style: TextStyle(fontSize: 16)),
+                          SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchPayments,
+                            child: Text('Try Again'),
+                          ),
+                        ],
+                      ),
+                    )
+                    : _filteredPayments.isEmpty
                     ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -297,18 +331,22 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                         ],
                       ),
                     )
-                    : ListView.builder(
-                      itemCount: _filteredPayments.length,
-                      itemBuilder: (context, index) {
-                        final payment = _filteredPayments[index];
-                        return _buildPaymentCard(payment);
-                      },
+                    : RefreshIndicator(
+                      onRefresh: _fetchPayments,
+                      child: ListView.builder(
+                        itemCount: _filteredPayments.length,
+                        itemBuilder: (context, index) {
+                          final payment = _filteredPayments[index];
+                          return _buildPaymentCard(payment);
+                        },
+                      ),
                     ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          // Handle add new payment
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text('Add new payment')));

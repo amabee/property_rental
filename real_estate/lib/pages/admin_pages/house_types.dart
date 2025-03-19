@@ -5,6 +5,7 @@ import 'package:real_estate/pages/admin_pages/dashboard.dart';
 import 'package:real_estate/pages/admin_pages/houses.dart';
 import 'package:real_estate/pages/admin_pages/payments.dart';
 import 'package:real_estate/pages/admin_pages/reports.dart';
+import 'package:real_estate/pages/admin_pages/tenants.dart';
 import 'package:real_estate/pages/admin_pages/users.dart';
 
 class HouseTypesScreen extends StatefulWidget {
@@ -221,7 +222,16 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
             leading: Icon(Icons.people),
             title: Text('Tenants'),
             onTap: () {
-              Navigator.pop(context);
+             Navigator.pop(context);
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder:
+                      (context) => TenantScreen(
+                        toggleTheme: widget.toggleTheme,
+                        isDarkMode: widget.isDarkMode,
+                      ),
+                ),
+              );
             },
           ),
           ListTile(

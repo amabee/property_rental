@@ -23,43 +23,7 @@ class StaffPaymentsScreen extends StatefulWidget {
 
 class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
   // Sample payment data
-  final List<Payment> _payments = [
-    Payment(
-      id: '1',
-      date: DateTime(2025, 3, 15),
-      tenantName: 'Maria Garcia',
-      invoiceNumber: 'INV-2025-001',
-      amount: 12500.00,
-    ),
-    Payment(
-      id: '2',
-      date: DateTime(2025, 3, 10),
-      tenantName: 'James Wilson',
-      invoiceNumber: 'INV-2025-002',
-      amount: 8500.00,
-    ),
-    Payment(
-      id: '3',
-      date: DateTime(2025, 3, 5),
-      tenantName: 'Sarah Johnson',
-      invoiceNumber: 'INV-2025-003',
-      amount: 15000.00,
-    ),
-    Payment(
-      id: '4',
-      date: DateTime(2025, 2, 28),
-      tenantName: 'Robert Lee',
-      invoiceNumber: 'INV-2025-004',
-      amount: 9200.00,
-    ),
-    Payment(
-      id: '5',
-      date: DateTime(2025, 2, 20),
-      tenantName: 'Emily Wong',
-      invoiceNumber: 'INV-2025-005',
-      amount: 10800.00,
-    ),
-  ];
+  final List<Payment> _payments = [];
 
   String _searchQuery = '';
   List<Payment> _filteredPayments = [];
