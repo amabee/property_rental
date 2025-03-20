@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:real_estate/pages/admin_pages/ui/monthlyReportsPage.dart';
+import 'package:real_estate/pages/admin_pages/ui/rentalBalancesPage.dart';
 import 'package:real_estate/pages/admin_pages/dashboard.dart';
 import 'package:real_estate/pages/admin_pages/house_types.dart';
 import 'package:real_estate/pages/admin_pages/houses.dart';
 import 'package:real_estate/pages/admin_pages/payments.dart';
 import 'package:real_estate/pages/admin_pages/tenants.dart';
 import 'package:real_estate/pages/admin_pages/users.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:real_estate/pages/login_page.dart';
 
 class ReportsScreen extends StatefulWidget {
   final Function toggleTheme;
@@ -282,7 +287,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             title: Text('Users'),
             onTap: () {
               Navigator.pop(context);
-               Navigator.of(context).pushReplacement(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder:
                       (context) => UsersScreen(
@@ -297,65 +302,77 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ListTile(
             leading: Icon(Icons.exit_to_app),
             title: Text('Logout'),
-            onTap: () {
-              // Add logout functionality
+            onTap: () async {
+              bool confirm = await _showLogoutConfirmationDialog();
+              if (confirm) {
+                await _performLogout();
+              } else {
+                Navigator.pop(context);
+              }
             },
           ),
         ],
       ),
     );
   }
-}
 
-// Placeholder pages for navigation
-class MonthlyPaymentsReportPage extends StatelessWidget {
-  final Function toggleTheme;
-  final bool isDarkMode;
-
-  const MonthlyPaymentsReportPage({
-    required this.toggleTheme,
-    required this.isDarkMode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Monthly Payments Report'),
-        actions: [
-          IconButton(
-            icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => toggleTheme(),
-          ),
-        ],
-      ),
-      body: const Center(child: Text('Monthly Payments Report Details')),
-    );
+  Future<bool> _showLogoutConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text(
+                'Are you sure you want to logout? All local data will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: Text('Logout'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
-}
 
-class RentalBalancesReportPage extends StatelessWidget {
-  final Function toggleTheme;
-  final bool isDarkMode;
+  Future<void> _performLogout() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(child: CircularProgressIndicator());
+        },
+      );
 
-  const RentalBalancesReportPage({
-    required this.toggleTheme,
-    required this.isDarkMode,
-  });
+      await Hive.box('myBox').clear();
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Rental Balances Report'),
-        actions: [
-          IconButton(
-            icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => toggleTheme(),
-          ),
-        ],
-      ),
-      body: const Center(child: Text('Rental Balances Report Details')),
-    );
+      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => LoginScreen(
+                toggleTheme: widget.toggleTheme,
+                isDarkMode: widget.isDarkMode,
+              ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
+    }
   }
+
+
+
 }

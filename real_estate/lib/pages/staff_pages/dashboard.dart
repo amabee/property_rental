@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:real_estate/data/queries/getDashboardData.dart';
 import 'package:real_estate/pages/staff_pages/house_types.dart';
 import 'package:real_estate/pages/staff_pages/houses.dart';
 import 'package:real_estate/pages/staff_pages/payments.dart';
 import 'package:real_estate/pages/staff_pages/reports.dart';
 import 'package:real_estate/pages/staff_pages/tenants.dart';
 import 'package:real_estate/pages/login_page.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class StaffDashboardScreen extends StatefulWidget {
   final Function toggleTheme;
@@ -20,15 +23,35 @@ class StaffDashboardScreen extends StatefulWidget {
 }
 
 class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
-  final int totalHouses = 24;
-  final int totalTenants = 18;
-  final double paymentsThisMonth = 45600.00;
+  int totalHouses = 0;
+  int totalTenants = 0;
+  double paymentsThisMonth = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchDashboardData();
+  }
+
+  Future<void> fetchDashboardData() async {
+    final data = await getDashboardData();
+
+    if (data != null) {
+      setState(() {
+        totalHouses = data['house_count'] ?? 0;
+        totalTenants = data['tenant_count'] ?? 0;
+        paymentsThisMonth = (data['payments_this_month'] ?? 0.0).toDouble();
+      });
+    } else {
+      print("Failed to fetch dashboard data.");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Staff Dashboard'),
+        title: Text('Dashboard'),
         actions: [
           IconButton(
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
@@ -77,13 +100,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                   ),
                 ],
               ),
-              SizedBox(height: 24),
-              Text(
-                'Recent Activity',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 16),
-              _buildRecentActivityList(),
             ],
           ),
         ),
@@ -213,11 +229,11 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'Staff User',
+                  'John Smith',
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 Text(
-                  'staff@example.com',
+                  'john.smith@example.com',
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
@@ -311,25 +327,79 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
               );
             },
           ),
+
           Divider(),
           ListTile(
             leading: Icon(Icons.exit_to_app),
             title: Text('Logout'),
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => LoginScreen(
-                        toggleTheme: widget.toggleTheme,
-                        isDarkMode: widget.isDarkMode,
-                      ),
-                ),
-              );
+            onTap: () async {
+              bool confirm = await _showLogoutConfirmationDialog();
+              if (confirm) {
+                await _performLogout();
+              } else {
+                Navigator.pop(context);
+              }
             },
           ),
         ],
       ),
     );
+  }
+
+  Future<bool> _showLogoutConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text(
+                'Are you sure you want to logout? All local data will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: Text('Logout'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(child: CircularProgressIndicator());
+        },
+      );
+
+      await Hive.box('myBox').clear();
+
+      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => LoginScreen(
+                toggleTheme: widget.toggleTheme,
+                isDarkMode: widget.isDarkMode,
+              ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
+    }
   }
 }

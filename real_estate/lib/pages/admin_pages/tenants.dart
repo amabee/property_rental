@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:real_estate/data/admin/houses.dart';
-import 'package:real_estate/data/admin/tenants.dart';
+import 'package:real_estate/data/queries/houses.dart';
+import 'package:real_estate/data/queries/tenants.dart';
 import 'package:real_estate/models/tenant.dart';
 import 'package:real_estate/pages/admin_pages/dashboard.dart';
 import 'package:real_estate/pages/admin_pages/houses.dart';
@@ -11,6 +11,8 @@ import 'package:real_estate/pages/admin_pages/users.dart';
 import 'package:real_estate/pages/login_page.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class TenantScreen extends StatefulWidget {
   final Function toggleTheme;
@@ -251,17 +253,13 @@ class _TenantScreenState extends State<TenantScreen> {
             ListTile(
               leading: Icon(Icons.exit_to_app),
               title: Text('Logout'),
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => LoginScreen(
-                          toggleTheme: widget.toggleTheme,
-                          isDarkMode: widget.isDarkMode,
-                        ),
-                  ),
-                );
+              onTap: () async {
+                bool confirm = await _showLogoutConfirmationDialog();
+                if (confirm) {
+                  await _performLogout();
+                } else {
+                  Navigator.pop(context);
+                }
               },
             ),
           ],
@@ -615,6 +613,66 @@ class _TenantScreenState extends State<TenantScreen> {
       },
     );
   }
+
+  Future<bool> _showLogoutConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text(
+                'Are you sure you want to logout? All local data will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: Text('Logout'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(child: CircularProgressIndicator());
+        },
+      );
+
+      await Hive.box('myBox').clear();
+
+      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => LoginScreen(
+                toggleTheme: widget.toggleTheme,
+                isDarkMode: widget.isDarkMode,
+              ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
+    }
+  }
+
+
+
 }
 
 class TenantCard extends StatelessWidget {

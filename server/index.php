@@ -377,7 +377,8 @@ class PropertyRental
     function getPayments()
     {
         include("conn.php");
-        $select_sql = "SELECT payments.*, tenants.* FROM `payments` JOIN tenants ON payments.tenant_id = tenants.id";
+        $select_sql = "SELECT payments.id AS payment_id, payments.tenant_id, payments.amount, payments.invoice, payments.date_created,
+         tenants.* FROM `payments` JOIN tenants ON payments.tenant_id = tenants.id";
         $select_stmt = $conn->prepare($select_sql);
         $select_stmt->execute();
         $row = $select_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -407,18 +408,26 @@ class PropertyRental
         include("conn.php");
         $data = json_decode($json, true);
 
-        $update_sql = "UPDATE `payments` SET `tenant_id` = :tenant_id, `amount` = :amount, `invoice` = :invoice WHERE `id` = :id";
-        $update_stmt = $conn->prepare($update_sql);
-        $update_stmt->bindParam(':id', $data['id']);
-        $update_stmt->bindParam(':tenant_id', $data['tenant_id']);
-        $update_stmt->bindParam(':amount', $data['amount']);
-        $update_stmt->bindParam(':invoice', $data['invoice']);
+        try {
+            $update_sql = "UPDATE `payments` SET `tenant_id` = :tenant_id, `amount` = :amount, `invoice` = :invoice WHERE `id` = :id";
+            $update_stmt = $conn->prepare($update_sql);
+            $update_stmt->bindParam(':id', $data['payment_id']);
+            $update_stmt->bindParam(':tenant_id', $data['tenant_id']);
+            $update_stmt->bindParam(':amount', $data['amount']);
+            $update_stmt->bindParam(':invoice', $data['invoice']);
 
-        if ($update_stmt->execute()) {
-            echo json_encode("1");
-        } else {
+            if ($update_stmt->execute()) {
+                echo json_encode("1");
+            } else {
+                echo json_encode("0");
+            }
+        } catch (PDOException $e) {
             echo json_encode("0");
+            error_log($e->getMessage());
         }
+
+
+        error_log(json_encode($data));
     }
 
     function deletePayment($json)
@@ -438,6 +447,206 @@ class PropertyRental
     }
 
     #endregion
+
+    #region Reports
+
+    function getBalancesReport($json)
+    {
+        include("conn.php");
+
+        // SQL query to select tenant details and calculate payment data
+        $select_sql = "
+            SELECT 
+                t.id,
+                CONCAT(t.lastname, ', ', t.firstname, ' ', t.middlename) AS name,
+                h.house_no,
+                h.price AS monthly_rent,
+                t.date_in
+            FROM 
+                tenants t
+            INNER JOIN 
+                houses h ON h.id = t.house_id
+            ORDER BY 
+                h.house_no DESC
+        ";
+
+        $select_stmt = $conn->prepare($select_sql);
+        $select_stmt->execute();
+        $tenants = $select_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $reportData = [];
+
+        foreach ($tenants as $tenant) {
+            $months = floor(abs(strtotime(date('Y-m-d') . " 23:59:59") - strtotime($tenant['date_in'] . " 23:59:59")) / (30 * 60 * 60 * 24));
+            $payable = $tenant['monthly_rent'] * $months;
+
+            // Fetch paid amount
+            $paid_stmt = $conn->prepare("SELECT SUM(amount) as paid FROM payments WHERE tenant_id = :tenant_id");
+            $paid_stmt->bindParam(':tenant_id', $tenant['id']);
+            $paid_stmt->execute();
+            $paid = $paid_stmt->fetch(PDO::FETCH_ASSOC)['paid'] ?? 0;
+
+            // Fetch last payment date
+            $last_payment_stmt = $conn->prepare("
+                SELECT date_created 
+                FROM payments 
+                WHERE tenant_id = :tenant_id 
+                ORDER BY unix_timestamp(date_created) DESC 
+                LIMIT 1
+            ");
+            $last_payment_stmt->bindParam(':tenant_id', $tenant['id']);
+            $last_payment_stmt->execute();
+            $last_payment_data = $last_payment_stmt->fetch(PDO::FETCH_ASSOC);
+            $last_payment = $last_payment_data ? date("M d, Y", strtotime($last_payment_data['date_created'])) : 'N/A';
+
+            // Calculate outstanding balance
+            $outstanding = $payable - $paid;
+
+            // Add calculated data to report
+            $reportData[] = [
+                'name' => $tenant['name'],
+                'house_no' => $tenant['house_no'],
+                'monthly_rent' => $tenant['monthly_rent'],
+                'date_in' => $tenant['date_in'],
+                'months' => $months,
+                'payable' => $payable,
+                'paid' => $paid,
+                'last_payment' => $last_payment,
+                'outstanding' => $outstanding
+            ];
+        }
+
+        echo json_encode($reportData);
+    }
+
+    function getMonthlyReports($json)
+    {
+        include("conn.php");
+
+        $data = json_decode($json, true);
+        $month_of = isset($data['month_of']) ? $data['month_of'] : date('Y-m');
+
+        $select_sql = "
+            SELECT 
+                p.*, 
+                CONCAT(t.lastname, ', ', t.firstname, ' ', t.middlename) AS name, 
+                h.house_no 
+            FROM 
+                payments p 
+            INNER JOIN 
+                tenants t ON t.id = p.tenant_id 
+            INNER JOIN 
+                houses h ON h.id = t.house_id 
+            WHERE 
+                DATE_FORMAT(p.date_created, '%Y-%m') = :month_of 
+            ORDER BY 
+                UNIX_TIMESTAMP(p.date_created) ASC
+        ";
+
+        $select_stmt = $conn->prepare($select_sql);
+        $select_stmt->bindParam(':month_of', $month_of);
+        $select_stmt->execute();
+
+        $rows = $select_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $tamount = 0;
+        foreach ($rows as $row) {
+            $tamount += $row['amount'];
+        }
+
+        $result = [
+            'payments' => $rows,
+            'total_amount' => $tamount
+        ];
+
+        echo json_encode($result);
+    }
+
+
+
+    #endregion
+
+    #regions Users
+
+    function getUsers()
+    {
+        include("conn.php");
+        $select_sql = "SELECT * FROM `users`";
+        $select_stmt = $conn->prepare($select_sql);
+        $select_stmt->execute();
+        $row = $select_stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($row);
+    }
+
+    function addUser($json)
+    {
+        include("conn.php");
+        $data = json_decode($json, true);
+
+        $insert_sql = "INSERT INTO `users`(`name`, `username`, `password`, `type`) VALUES ( :name, :username, :password, :type)";
+        $insert_stmt = $conn->prepare($insert_sql);
+        $insert_stmt->bindParam(':name', $data['name']);
+        $insert_stmt->bindParam(':username', $data['username']);
+        $insert_stmt->bindParam(':password', md5($data['password']));
+        $insert_stmt->bindParam(':type', $data['type']);
+
+        if ($insert_stmt->execute()) {
+            echo json_encode("1");
+        } else {
+            echo json_encode("0");
+        }
+    }
+
+    function updateUser($json)
+    {
+        include("conn.php");
+        $data = json_decode($json, true);
+
+        $update_sql = "UPDATE `users` SET `name` = :name, `username` = :username";
+
+        if (!empty($data['password'])) {
+            $update_sql .= ", `password` = :password";
+        }
+
+        $update_sql .= ", `type` = :type WHERE `id` = :id";
+
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bindParam(':id', $data['id']);
+        $update_stmt->bindParam(':name', $data['name']);
+        $update_stmt->bindParam(':username', $data['username']);
+        $update_stmt->bindParam(':type', $data['type']);
+
+        if (!empty($data['password'])) {
+            $update_stmt->bindParam(':password', md5($data['password']));
+        }
+
+        if ($update_stmt->execute()) {
+            echo json_encode("1");
+        } else {
+            echo json_encode("0");
+        }
+    }
+
+
+
+    function deleteUser($json)
+    {
+        include("conn.php");
+        $data = json_decode($json, true);
+
+        $delete_sql = "DELETE FROM `users` WHERE `id` = :id";
+        $delete_stmt = $conn->prepare($delete_sql);
+        $delete_stmt->bindParam(':id', $data['id']);
+
+        if ($delete_stmt->execute()) {
+            echo json_encode("1");
+        } else {
+            echo json_encode("0");
+        }
+    }
+
+    #endregion
+
 }
 
 $api = new PropertyRental();
@@ -499,6 +708,25 @@ if ($_SERVER["REQUEST_METHOD"] == "GET" || $_SERVER["REQUEST_METHOD"] == "POST")
             case 'deletePayment':
                 $api->deletePayment($json);
                 break;
+            case 'getBalancesReport':
+                $api->getBalancesReport($json);
+                break;
+            case 'getMonthlyReports':
+                $api->getMonthlyReports($json);
+                break;
+            case 'viewUsers':
+                $api->getUsers();
+                break;
+            case 'addUser':
+                $api->addUser($json);
+                break;
+            case 'updateUser':
+                $api->updateUser($json);
+                break;
+            case 'deleteUser':
+                $api->deleteUser($json);
+                break;
+
             default:
                 echo json_encode(["error" => "Invalid operation"]);
                 break;

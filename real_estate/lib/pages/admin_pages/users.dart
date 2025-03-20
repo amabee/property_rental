@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:real_estate/data/queries/users.dart';
 import 'package:real_estate/pages/admin_pages/dashboard.dart';
 import 'package:real_estate/pages/admin_pages/house_types.dart';
 import 'package:real_estate/pages/admin_pages/houses.dart';
 import 'package:real_estate/pages/admin_pages/payments.dart';
 import 'package:real_estate/pages/admin_pages/reports.dart';
 import 'package:real_estate/pages/admin_pages/tenants.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:real_estate/pages/login_page.dart';
 
 class UsersScreen extends StatefulWidget {
   final Function toggleTheme;
@@ -17,58 +21,16 @@ class UsersScreen extends StatefulWidget {
 }
 
 class _UsersScreenState extends State<UsersScreen> {
-  // Sample user data
-  final List<Map<String, dynamic>> users = [
-    {
-      'id': 1,
-      'name': 'John Smith',
-      'email': 'john.smith@example.com',
-      'role': 'Admin',
-      'status': 'Active',
-      'lastLogin': '2025-03-17 14:30',
-    },
-    {
-      'id': 2,
-      'name': 'Maria Garcia',
-      'email': 'maria.garcia@example.com',
-      'role': 'Property Manager',
-      'status': 'Active',
-      'lastLogin': '2025-03-16 09:15',
-    },
-    {
-      'id': 3,
-      'name': 'James Wilson',
-      'email': 'james.wilson@example.com',
-      'role': 'Agent',
-      'status': 'Active',
-      'lastLogin': '2025-03-18 08:45',
-    },
-    {
-      'id': 4,
-      'name': 'Sarah Johnson',
-      'email': 'sarah.johnson@example.com',
-      'role': 'Agent',
-      'status': 'Inactive',
-      'lastLogin': '2025-03-10 11:20',
-    },
-    {
-      'id': 5,
-      'name': 'Michael Brown',
-      'email': 'michael.brown@example.com',
-      'role': 'Property Manager',
-      'status': 'Active',
-      'lastLogin': '2025-03-17 16:05',
-    },
-  ];
+  final List<Map<String, dynamic>> users = [];
+  bool isLoading = true;
 
-  // Text controllers for search
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> filteredUsers = [];
 
   @override
   void initState() {
     super.initState();
-    filteredUsers = List.from(users);
+    _fetchUsers();
     _searchController.addListener(_filterUsers);
   }
 
@@ -76,6 +38,39 @@ class _UsersScreenState extends State<UsersScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchUsers() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    final usersList = await getUsers();
+
+    if (usersList != null) {
+      setState(() {
+        users.clear();
+        for (var user in usersList) {
+          users.add({
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['username'],
+            'role': user['type'] == 1 ? 'Admin' : 'Staff',
+            'status': 'Active',
+          });
+        }
+        filteredUsers = List.from(users);
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        isLoading = false;
+      });
+      // Show error message
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load users')));
+    }
   }
 
   void _filterUsers() {
@@ -204,7 +199,6 @@ class _UsersScreenState extends State<UsersScreen> {
             DataColumn(label: Text('Email')),
             DataColumn(label: Text('Role')),
             DataColumn(label: Text('Status')),
-            DataColumn(label: Text('Last Login')),
             DataColumn(label: Text('Actions')),
           ],
           rows:
@@ -236,7 +230,7 @@ class _UsersScreenState extends State<UsersScreen> {
                         ),
                       ),
                     ),
-                    DataCell(Text(user['lastLogin'])),
+
                     DataCell(
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -351,22 +345,6 @@ class _UsersScreenState extends State<UsersScreen> {
                         ),
                       ],
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'Last Login',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-                        Text(
-                          user['lastLogin'],
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
                 SizedBox(height: 16),
@@ -398,6 +376,11 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   void _showAddUserDialog() {
+    final nameController = TextEditingController();
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+    String? selectedRole;
+
     showDialog(
       context: context,
       builder:
@@ -408,6 +391,7 @@ class _UsersScreenState extends State<UsersScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
+                    controller: nameController,
                     decoration: InputDecoration(
                       labelText: 'Name',
                       border: OutlineInputBorder(),
@@ -415,13 +399,15 @@ class _UsersScreenState extends State<UsersScreen> {
                   ),
                   SizedBox(height: 16),
                   TextField(
+                    controller: usernameController,
                     decoration: InputDecoration(
-                      labelText: 'Email',
+                      labelText: 'Username',
                       border: OutlineInputBorder(),
                     ),
                   ),
                   SizedBox(height: 16),
                   TextField(
+                    controller: passwordController,
                     decoration: InputDecoration(
                       labelText: 'Password',
                       border: OutlineInputBorder(),
@@ -435,31 +421,41 @@ class _UsersScreenState extends State<UsersScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items:
-                        ['Admin', 'Property Manager', 'Agent']
+                        [
+                              {'value': '1', 'label': 'Admin'},
+                              {'value': '2', 'label': 'Staff'},
+                            ]
                             .map(
                               (role) => DropdownMenuItem(
-                                value: role,
-                                child: Text(role),
+                                value: role['value'],
+                                child: Text(role['label']!),
                               ),
                             )
                             .toList(),
-                    onChanged: (value) {},
+                    onChanged: (value) {
+                      selectedRole = value;
+                    },
                   ),
                 ],
               ),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => {print('Cancelled'), Navigator.pop(context)},
                 child: Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: () {
-                  // Add user logic here
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('User added successfully')),
+                onPressed: () async {
+                  await addUser(
+                    context,
+                    nameController.text,
+                    usernameController.text,
+                    passwordController.text,
+                    selectedRole.toString(),
                   );
+
+                  Navigator.pop(context);
+                  _fetchUsers();
                 },
                 child: Text('Add User'),
               ),
@@ -470,9 +466,13 @@ class _UsersScreenState extends State<UsersScreen> {
 
   void _showEditUserDialog(Map<String, dynamic> user) {
     final nameController = TextEditingController(text: user['name']);
-    final emailController = TextEditingController(text: user['email']);
+    final usernameController = TextEditingController(text: user['email']);
+    final passwordController = TextEditingController();
     String role = user['role'];
-    String status = user['status'];
+
+    final roleMap = {'Admin': '1', 'Staff': '2'};
+
+    String roleValue = roleMap[role] ?? '1';
 
     showDialog(
       context: context,
@@ -492,9 +492,17 @@ class _UsersScreenState extends State<UsersScreen> {
                   ),
                   SizedBox(height: 16),
                   TextField(
-                    controller: emailController,
+                    controller: usernameController,
                     decoration: InputDecoration(
-                      labelText: 'Email',
+                      labelText: 'Username',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -504,53 +512,55 @@ class _UsersScreenState extends State<UsersScreen> {
                       labelText: 'Role',
                       border: OutlineInputBorder(),
                     ),
-                    value: role,
+                    value: roleValue,
                     items:
-                        ['Admin', 'Property Manager', 'Agent']
+                        [
+                              {'value': '1', 'label': 'Admin'},
+                              {'value': '2', 'label': 'Staff'},
+                            ]
                             .map(
-                              (r) => DropdownMenuItem(value: r, child: Text(r)),
+                              (r) => DropdownMenuItem(
+                                value: r['value'],
+                                child: Text(r['label']!),
+                              ),
                             )
                             .toList(),
                     onChanged: (value) {
                       if (value != null) {
-                        role = value;
+                        roleValue = value;
+                        role =
+                            value == '1'
+                                ? 'Admin'
+                                : value == '2'
+                                ? 'Property Manager'
+                                : '';
                       }
                     },
                   ),
                   SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: 'Status',
-                      border: OutlineInputBorder(),
-                    ),
-                    value: status,
-                    items:
-                        ['Active', 'Inactive', 'Suspended']
-                            .map(
-                              (s) => DropdownMenuItem(value: s, child: Text(s)),
-                            )
-                            .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        status = value;
-                      }
-                    },
-                  ),
                 ],
               ),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed:
+                    () => {print('Edit cancelled'), Navigator.pop(context)},
                 child: Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: () {
-                  // Edit user logic here
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('User updated successfully')),
+                onPressed: () async {
+                  await updateUser(
+                    context,
+                    user['id'].toString(),
+                    nameController.text,
+                    usernameController.text,
+                    passwordController.text,
+                    roleValue,
                   );
+
+                  Navigator.pop(context);
+
+                  _fetchUsers();
                 },
                 child: Text('Update User'),
               ),
@@ -572,12 +582,12 @@ class _UsersScreenState extends State<UsersScreen> {
                 child: Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: () {
-                  // Delete user logic here
+                onPressed: () async {
+                  await deleteUser(context, user['id'].toString());
+
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('User deleted successfully')),
-                  );
+
+                  _fetchUsers();
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 child: Text('Delete'),
@@ -726,12 +736,78 @@ class _UsersScreenState extends State<UsersScreen> {
           ListTile(
             leading: Icon(Icons.exit_to_app),
             title: Text('Logout'),
-            onTap: () {
-              Navigator.pop(context);
+            onTap: () async {
+              bool confirm = await _showLogoutConfirmationDialog();
+              if (confirm) {
+                await _performLogout();
+              } else {
+                Navigator.pop(context);
+              }
             },
           ),
         ],
       ),
     );
   }
+
+  Future<bool> _showLogoutConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text(
+                'Are you sure you want to logout? All local data will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: Text('Logout'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(child: CircularProgressIndicator());
+        },
+      );
+
+      await Hive.box('myBox').clear();
+
+      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => LoginScreen(
+                toggleTheme: widget.toggleTheme,
+                isDarkMode: widget.isDarkMode,
+              ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
+    }
+  }
+
+
+
+
 }
