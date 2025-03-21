@@ -566,6 +566,7 @@ class PropertyRental
 
     #endregion
 
+
     #regions Users
 
     function getUsers()
@@ -626,8 +627,6 @@ class PropertyRental
             echo json_encode("0");
         }
     }
-
-
 
     function deleteUser($json)
     {

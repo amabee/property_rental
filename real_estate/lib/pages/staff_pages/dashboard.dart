@@ -43,7 +43,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       setState(() {
         totalHouses = data['house_count'] ?? 0;
         totalTenants = data['tenant_count'] ?? 0;
-        paymentsThisMonth = (data['payments_this_month'] ?? 0.0).toDouble();
+        paymentsThisMonth = (data['total_payments_this_month'] ?? 0.0).toDouble();
       });
     } else {
       print("Failed to fetch dashboard data.");
@@ -165,7 +165,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                   SizedBox(height: 8),
                   Text(
                     value,
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, overflow: TextOverflow.clip),
                   ),
                 ],
               ),

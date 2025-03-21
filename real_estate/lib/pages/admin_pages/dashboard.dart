@@ -41,7 +41,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         totalHouses = data['house_count'] ?? 0;
         totalTenants = data['tenant_count'] ?? 0;
-        paymentsThisMonth = (data['payments_this_month'] ?? 0.0).toDouble();
+        paymentsThisMonth =
+            (data['total_payments_this_month'] ?? 0.0).toDouble();
       });
     } else {
       print("Failed to fetch dashboard data.");
@@ -163,7 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   SizedBox(height: 8),
                   Text(
                     value,
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, overflow: TextOverflow.clip),
                   ),
                 ],
               ),
@@ -172,59 +173,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildRecentActivityList() {
-    final List<Map<String, dynamic>> activities = [
-      {
-        'title': 'New Tenant Registration',
-        'description': 'James Wilson registered as a tenant',
-        'time': '2 hours ago',
-        'icon': Icons.person_add,
-        'color': Colors.green,
-      },
-      {
-        'title': 'Payment Received',
-        'description': 'Payment of ₱8,500 received from Maria Garcia',
-        'time': '4 hours ago',
-        'icon': Icons.payments,
-        'color': Colors.blue,
-      },
-      {
-        'title': 'Property Listed',
-        'description': 'New property at 789 Pine St. has been listed',
-        'time': '1 day ago',
-        'icon': Icons.home,
-        'color': Colors.purple,
-      },
-    ];
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      itemCount: activities.length,
-      itemBuilder: (context, index) {
-        final activity = activities[index];
-        return Card(
-          margin: EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: activity['color'].withOpacity(0.2),
-              child: Icon(activity['icon'], color: activity['color']),
-            ),
-            title: Text(activity['title']),
-            subtitle: Text(activity['description']),
-            trailing: Text(
-              activity['time'],
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-          ),
-        );
-      },
     );
   }
 
