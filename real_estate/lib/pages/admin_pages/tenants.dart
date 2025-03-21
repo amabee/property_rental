@@ -28,12 +28,34 @@ class _TenantScreenState extends State<TenantScreen> {
   final List<Tenant> _tenants = [];
   bool _isLoading = true;
   List<dynamic> _houses = [];
+  String userName = "User";
+  String userUsername = "";
 
   @override
   void initState() {
     super.initState();
     _fetchTenants();
     _fetchHouses();
+    getUserData();
+  }
+
+  Future<void> getUserData() async {
+    try {
+      final box = Hive.box('myBox');
+      final name = box.get('name');
+      final username = box.get('username');
+
+      print(box);
+
+      if (name != null) {
+        setState(() {
+          userName = name;
+          userUsername = username ?? "";
+        });
+      }
+    } catch (e) {
+      print("Error retrieving user data: $e");
+    }
   }
 
   Future<void> _fetchHouses() async {
@@ -135,11 +157,11 @@ class _TenantScreenState extends State<TenantScreen> {
                   ),
                   SizedBox(height: 10),
                   Text(
-                    'John Smith',
+                    userName,
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                   Text(
-                    'john.smith@example.com',
+                    userUsername,
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
@@ -670,9 +692,6 @@ class _TenantScreenState extends State<TenantScreen> {
       ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
     }
   }
-
-
-
 }
 
 class TenantCard extends StatelessWidget {

@@ -1,27 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:real_estate/pages/admin_pages/ui/rentalBalancesPage.dart';
+import 'package:real_estate/pages/login_page.dart';
 import 'package:real_estate/pages/staff_pages/dashboard.dart';
 import 'package:real_estate/pages/staff_pages/house_types.dart';
 import 'package:real_estate/pages/staff_pages/houses.dart';
 import 'package:real_estate/pages/staff_pages/payments.dart';
 import 'package:real_estate/pages/staff_pages/tenants.dart';
-
+import 'package:real_estate/pages/staff_pages/ui/monthlyReportsPage.dart';
 
 class StaffReportsScreen extends StatefulWidget {
   final Function toggleTheme;
   final bool isDarkMode;
 
-  const StaffReportsScreen({required this.toggleTheme, required this.isDarkMode});
+  const StaffReportsScreen({
+    required this.toggleTheme,
+    required this.isDarkMode,
+  });
 
   @override
   _StaffReportsScreenState createState() => _StaffReportsScreenState();
 }
 
 class _StaffReportsScreenState extends State<StaffReportsScreen> {
+  String userName = "User";
+  String userUsername = "";
+
+  @override
+  void initState() {
+    super.initState();
+    getUserData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Staff Reports'),
+        title: Text('Reports'),
         actions: [
           IconButton(
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
@@ -51,7 +66,7 @@ class _StaffReportsScreenState extends State<StaffReportsScreen> {
                     context,
                     MaterialPageRoute(
                       builder:
-                          (context) => StaffMonthlyPaymentsReportPage(
+                          (context) => MonthlyPaymentsReportPage(
                             toggleTheme: widget.toggleTheme,
                             isDarkMode: widget.isDarkMode,
                           ),
@@ -71,7 +86,7 @@ class _StaffReportsScreenState extends State<StaffReportsScreen> {
                     context,
                     MaterialPageRoute(
                       builder:
-                          (context) => StaffRentalBalancesReportPage(
+                          (context) => RentalBalancesReportPage(
                             toggleTheme: widget.toggleTheme,
                             isDarkMode: widget.isDarkMode,
                           ),
@@ -179,11 +194,11 @@ class _StaffReportsScreenState extends State<StaffReportsScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'Staff Member',
+                  userName,
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 Text(
-                  'staff@example.com',
+                  userUsername,
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
@@ -282,65 +297,93 @@ class _StaffReportsScreenState extends State<StaffReportsScreen> {
           ListTile(
             leading: Icon(Icons.exit_to_app),
             title: Text('Logout'),
-            onTap: () {
-              // Add logout functionality
+            onTap: () async {
+              bool confirm = await _showLogoutConfirmationDialog();
+              if (confirm) {
+                await _performLogout();
+              } else {
+                Navigator.pop(context);
+              }
             },
           ),
         ],
       ),
     );
   }
-}
 
-// Placeholder pages for navigation
-class StaffMonthlyPaymentsReportPage extends StatelessWidget {
-  final Function toggleTheme;
-  final bool isDarkMode;
-
-  const StaffMonthlyPaymentsReportPage({
-    required this.toggleTheme,
-    required this.isDarkMode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Staff Monthly Payments Report'),
-        actions: [
-          IconButton(
-            icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => toggleTheme(),
-          ),
-        ],
-      ),
-      body: const Center(child: Text('Staff Monthly Payments Report Details')),
-    );
+  Future<bool> _showLogoutConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text(
+                'Are you sure you want to logout? All local data will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: Text('Logout'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
-}
 
-class StaffRentalBalancesReportPage extends StatelessWidget {
-  final Function toggleTheme;
-  final bool isDarkMode;
+  Future<void> _performLogout() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(child: CircularProgressIndicator());
+        },
+      );
 
-  const StaffRentalBalancesReportPage({
-    required this.toggleTheme,
-    required this.isDarkMode,
-  });
+      await Hive.box('myBox').clear();
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Staff Rental Balances Report'),
-        actions: [
-          IconButton(
-            icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => toggleTheme(),
-          ),
-        ],
-      ),
-      body: const Center(child: Text('Staff Rental Balances Report Details')),
-    );
+      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => LoginScreen(
+                toggleTheme: widget.toggleTheme,
+                isDarkMode: widget.isDarkMode,
+              ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
+    }
+  }
+
+  Future<void> getUserData() async {
+    try {
+      final box = Hive.box('myBox');
+      final name = box.get('name');
+      final username = box.get('username');
+
+      print(box);
+
+      if (name != null) {
+        setState(() {
+          userName = name;
+          userUsername = username ?? "";
+        });
+      }
+    } catch (e) {
+      print("Error retrieving user data: $e");
+    }
   }
 }

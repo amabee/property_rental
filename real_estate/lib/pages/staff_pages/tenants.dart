@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:real_estate/data/queries/houses.dart';
+import 'package:real_estate/data/queries/tenants.dart';
 import 'package:real_estate/models/tenant.dart';
 import 'package:real_estate/pages/staff_pages/dashboard.dart';
 import 'package:real_estate/pages/staff_pages/houses.dart';
@@ -19,12 +22,97 @@ class StaffTenantScreen extends StatefulWidget {
 
 class _StaffTenantScreenState extends State<StaffTenantScreen> {
   final List<Tenant> _tenants = [];
+  bool _isLoading = true;
+  List<dynamic> _houses = [];
+  String userName = "User";
+  String userUsername = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTenants();
+    _fetchHouses();
+    getUserData();
+  }
+
+  Future<void> getUserData() async {
+    try {
+      final box = Hive.box('myBox');
+      final name = box.get('name');
+      final username = box.get('username');
+
+      print(box);
+
+      if (name != null) {
+        setState(() {
+          userName = name;
+          userUsername = username ?? "";
+        });
+      }
+    } catch (e) {
+      print("Error retrieving user data: $e");
+    }
+  }
+
+  Future<void> _fetchHouses() async {
+    final housesData = await getHouses();
+    if (housesData != null) {
+      setState(() {
+        _houses = housesData;
+      });
+    }
+  }
+
+  Future<void> _fetchTenants() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final tenantsData = await getTenants();
+
+    if (tenantsData != null) {
+      setState(() {
+        _tenants.clear();
+        _tenants.addAll(
+          tenantsData.map(
+            (data) => Tenant(
+              id: data['id'].toString(),
+              firstname: data['firstname'].toString(),
+              middlename: data['middlename'].toString(),
+              lastname: data['lastname'].toString(),
+              email: data['email'].toString(),
+              contact: data['contact'].toString(),
+              houseID: data['house_id'].toString(),
+              status: data['status_text'].toString(),
+              dateIn: data['date_in'].toString(),
+              houseNo: data['house_no'].toString(),
+              monthlyRent:
+                  data['monthly_rent'] is num ? data['monthly_rent'] : 0.0,
+              payable: data['payable'] is num ? data['payable'] : 0.0,
+              paid: data['paid'] is num ? data['paid'] : 0.0,
+              lastPayment: data['last_payment'].toString(),
+              outstanding:
+                  data['outstanding'] is num ? data['outstanding'] : 0.0,
+            ),
+          ),
+        );
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load tenants')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Staff Tenants'),
+        title: Text('Tenants'),
         actions: [
           IconButton(
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
@@ -32,7 +120,13 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
           ),
         ],
       ),
-      body: _buildTenantList(_tenants),
+      body:
+          _isLoading
+              ? Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                onRefresh: _fetchTenants,
+                child: _buildTenantList(_tenants),
+              ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           _showAddTenantDialog(context);
@@ -59,11 +153,11 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
                   ),
                   SizedBox(height: 10),
                   Text(
-                    'Staff Member',
+                    userName,
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                   Text(
-                    'staff@example.com',
+                    userUsername,
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
@@ -118,8 +212,9 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.history),
+              leading: Icon(Icons.people),
               title: Text('Tenants'),
+              selected: true,
               onTap: () {
                 Navigator.pop(context);
               },
@@ -161,17 +256,13 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
             ListTile(
               leading: Icon(Icons.exit_to_app),
               title: Text('Logout'),
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => LoginScreen(
-                          toggleTheme: widget.toggleTheme,
-                          isDarkMode: widget.isDarkMode,
-                        ),
-                  ),
-                );
+              onTap: () async {
+                bool confirm = await _showLogoutConfirmationDialog();
+                if (confirm) {
+                  await _performLogout();
+                } else {
+                  Navigator.pop(context);
+                }
               },
             ),
           ],
@@ -219,21 +310,30 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildDetailRow('Name', tenant.name),
+                _buildDetailRow(
+                  'Full Name',
+                  '${tenant.firstname} ${tenant.middlename} ${tenant.lastname}',
+                ),
                 _buildDetailRow('Email', tenant.email),
-                _buildDetailRow('Phone', tenant.phone),
-                _buildDetailRow('Property', tenant.propertyName),
-                _buildDetailRow('Lease Start', _formatDate(tenant.leaseStart)),
-                _buildDetailRow('Lease End', _formatDate(tenant.leaseEnd)),
+                _buildDetailRow('Phone', tenant.contact),
+                _buildDetailRow('Property ID', tenant.houseID),
+                _buildDetailRow('House No', tenant.houseNo),
+                _buildDetailRow('Date In', tenant.dateIn),
                 _buildDetailRow(
                   'Monthly Rent',
                   '₱${tenant.monthlyRent.toStringAsFixed(2)}',
                 ),
                 _buildDetailRow(
-                  'Deposit Paid',
-                  tenant.depositPaid ? 'Yes' : 'No',
+                  'Payable',
+                  '₱${tenant.payable.toStringAsFixed(2)}',
                 ),
-                _buildDetailRow('Payment Status', tenant.paymentStatus),
+                _buildDetailRow('Paid', '₱${tenant.paid.toStringAsFixed(2)}'),
+                _buildDetailRow(
+                  'Outstanding',
+                  '₱${tenant.outstanding.toStringAsFixed(2)}',
+                ),
+                _buildDetailRow('Last Payment', tenant.lastPayment),
+                _buildDetailRow('Status', tenant.status),
               ],
             ),
           ),
@@ -270,14 +370,22 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
   }
 
   void _showEditTenantDialog(BuildContext context, Tenant tenant) {
-    final nameController = TextEditingController(text: tenant.name);
+    final firstnameController = TextEditingController(text: tenant.firstname);
+    final middlenameController = TextEditingController(text: tenant.middlename);
+    final lastnameController = TextEditingController(text: tenant.lastname);
     final emailController = TextEditingController(text: tenant.email);
-    final phoneController = TextEditingController(text: tenant.phone);
+    final contactController = TextEditingController(text: tenant.contact);
     final rentController = TextEditingController(
       text: tenant.monthlyRent.toString(),
     );
-    String paymentStatus = tenant.paymentStatus;
-    bool depositPaid = tenant.depositPaid;
+    String status = tenant.status;
+    String selectedHouseId = tenant.houseID;
+
+    // Find the house in our list that matches the tenant's house ID
+    dynamic selectedHouse = _houses.firstWhere(
+      (house) => house['id'].toString() == selectedHouseId,
+      orElse: () => null,
+    );
 
     showDialog(
       context: context,
@@ -289,41 +397,49 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(labelText: 'Name'),
+                  controller: firstnameController,
+                  decoration: InputDecoration(labelText: 'First Name'),
+                ),
+                TextField(
+                  controller: middlenameController,
+                  decoration: InputDecoration(labelText: 'Middle Name'),
+                ),
+                TextField(
+                  controller: lastnameController,
+                  decoration: InputDecoration(labelText: 'Last Name'),
                 ),
                 TextField(
                   controller: emailController,
                   decoration: InputDecoration(labelText: 'Email'),
                 ),
                 TextField(
-                  controller: phoneController,
-                  decoration: InputDecoration(labelText: 'Phone'),
-                ),
-                TextField(
-                  controller: rentController,
-                  decoration: InputDecoration(labelText: 'Monthly Rent'),
-                  keyboardType: TextInputType.number,
+                  controller: contactController,
+                  decoration: InputDecoration(labelText: 'Contact Number'),
                 ),
                 DropdownButtonFormField<String>(
-                  value: paymentStatus,
-                  decoration: InputDecoration(labelText: 'Payment Status'),
+                  value: selectedHouseId,
+                  decoration: InputDecoration(labelText: 'House'),
+                  isExpanded: true,
                   items:
-                      ['Current', 'Late', 'Overdue'].map((status) {
-                        return DropdownMenuItem(
-                          value: status,
-                          child: Text(status),
+                      _houses.map<DropdownMenuItem<String>>((house) {
+                        return DropdownMenuItem<String>(
+                          value: house['id'].toString(),
+                          child: Container(
+                            constraints: BoxConstraints(maxWidth: 250),
+                            child: Text(
+                              "House #${house['house_no']} - ${house['description']}",
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
                         );
                       }).toList(),
                   onChanged: (value) {
-                    paymentStatus = value!;
-                  },
-                ),
-                CheckboxListTile(
-                  title: Text('Deposit Paid'),
-                  value: depositPaid,
-                  onChanged: (value) {
-                    depositPaid = value!;
+                    selectedHouseId = value!;
+                    selectedHouse = _houses.firstWhere(
+                      (house) => house['id'].toString() == value,
+                      orElse: () => null,
+                    );
                   },
                 ),
               ],
@@ -337,20 +453,21 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
               child: Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                // Update tenant logic here
-                // setState(() {
-                //   tenant.name = nameController.text;
-                //   tenant.email = emailController.text;
-                //   tenant.phone = phoneController.text;
-                //   tenant.monthlyRent = double.parse(rentController.text);
-                //   tenant.paymentStatus = paymentStatus;
-                //   tenant.depositPaid = depositPaid;
-                // });
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Tenant updated successfully')),
+              onPressed: () async {
+                await updateTenant(
+                  context,
+                  int.parse(tenant.id),
+                  firstnameController.text,
+                  middlenameController.text,
+                  lastnameController.text,
+                  emailController.text,
+                  contactController.text,
+                  selectedHouseId,
                 );
+
+                await _fetchTenants();
+
+                Navigator.of(context).pop();
               },
               child: Text('Save'),
             ),
@@ -366,7 +483,9 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Delete Tenant'),
-          content: Text('Are you sure you want to delete ${tenant.name}?'),
+          content: Text(
+            'Are you sure you want to delete ${tenant.firstname} ${tenant.lastname}?',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -375,10 +494,12 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
               child: Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _tenants.removeWhere((t) => t.id == tenant.id);
-                });
+              onPressed: () async {
+                // setState(() {
+                //   _tenants.removeWhere((t) => t.id == tenant.id);
+                // });
+                await deleteTenant(context, tenant.id);
+                _fetchTenants();
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Tenant deleted successfully')),
@@ -394,13 +515,13 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
   }
 
   void _showAddTenantDialog(BuildContext context) {
-    final nameController = TextEditingController();
+    final firstnameController = TextEditingController();
+    final middlenameController = TextEditingController();
+    final lastnameController = TextEditingController();
     final emailController = TextEditingController();
-    final phoneController = TextEditingController();
-    final propertyController = TextEditingController();
-    final rentController = TextEditingController();
-    String paymentStatus = 'Current';
-    bool depositPaid = false;
+    final contactController = TextEditingController();
+    String? selectedHouseId;
+    dynamic selectedHouse;
 
     showDialog(
       context: context,
@@ -412,45 +533,50 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(labelText: 'Name'),
+                  controller: firstnameController,
+                  decoration: InputDecoration(labelText: 'First Name'),
+                ),
+                TextField(
+                  controller: middlenameController,
+                  decoration: InputDecoration(labelText: 'Middle Name'),
+                ),
+                TextField(
+                  controller: lastnameController,
+                  decoration: InputDecoration(labelText: 'Last Name'),
                 ),
                 TextField(
                   controller: emailController,
                   decoration: InputDecoration(labelText: 'Email'),
                 ),
                 TextField(
-                  controller: phoneController,
-                  decoration: InputDecoration(labelText: 'Phone'),
-                ),
-                TextField(
-                  controller: propertyController,
-                  decoration: InputDecoration(labelText: 'Property'),
-                ),
-                TextField(
-                  controller: rentController,
-                  decoration: InputDecoration(labelText: 'Monthly Rent'),
-                  keyboardType: TextInputType.number,
+                  controller: contactController,
+                  decoration: InputDecoration(labelText: 'Contact Number'),
                 ),
                 DropdownButtonFormField<String>(
-                  value: paymentStatus,
-                  decoration: InputDecoration(labelText: 'Payment Status'),
+                  value: selectedHouseId,
+                  decoration: InputDecoration(labelText: 'House'),
+                  hint: Text('Select a house'),
+                  isExpanded: true,
                   items:
-                      ['Current', 'Late', 'Overdue'].map((status) {
-                        return DropdownMenuItem(
-                          value: status,
-                          child: Text(status),
+                      _houses.map<DropdownMenuItem<String>>((house) {
+                        return DropdownMenuItem<String>(
+                          value: house['id'].toString(),
+                          child: Container(
+                            constraints: BoxConstraints(maxWidth: 250),
+                            child: Text(
+                              "House #${house['house_no']} - ${house['description']}",
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
                         );
                       }).toList(),
                   onChanged: (value) {
-                    paymentStatus = value!;
-                  },
-                ),
-                CheckboxListTile(
-                  title: Text('Deposit Paid'),
-                  value: depositPaid,
-                  onChanged: (value) {
-                    depositPaid = value!;
+                    selectedHouseId = value;
+                    selectedHouse = _houses.firstWhere(
+                      (house) => house['id'].toString() == value,
+                      orElse: () => null,
+                    );
                   },
                 ),
               ],
@@ -464,29 +590,24 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
               child: Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                // Add new tenant logic
-                // setState(() {
-                //   _tenants.add(
-                //     Tenant(
-                //       id: DateTime.now().millisecondsSinceEpoch.toString(),
-                //       name: nameController.text,
-                //       email: emailController.text,
-                //       phone: phoneController.text,
-                //       propertyId: '3',
-                //       propertyName: propertyController.text,
-                //       leaseStart: DateTime.now(),
-                //       leaseEnd: DateTime.now().add(Duration(days: 365)),
-                //       monthlyRent: double.tryParse(rentController.text) ?? 0,
-                //       depositPaid: depositPaid,
-                //       paymentStatus: paymentStatus,
-                //     ),
-                //   );
-                // });
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Tenant added successfully')),
+              onPressed: () async {
+                if (selectedHouseId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Please select a house')),
+                  );
+                  return;
+                }
+                await addTenants(
+                  context,
+                  firstnameController.text,
+                  middlenameController.text,
+                  lastnameController.text,
+                  emailController.text,
+                  contactController.text,
+                  selectedHouseId,
                 );
+                await _fetchTenants();
+                Navigator.of(context).pop();
               },
               child: Text('Add'),
             ),
@@ -496,8 +617,61 @@ class _StaffTenantScreenState extends State<StaffTenantScreen> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
+  Future<bool> _showLogoutConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text(
+                'Are you sure you want to logout? All local data will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: Text('Logout'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(child: CircularProgressIndicator());
+        },
+      );
+
+      await Hive.box('myBox').clear();
+
+      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => LoginScreen(
+                toggleTheme: widget.toggleTheme,
+                isDarkMode: widget.isDarkMode,
+              ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
+    }
   }
 }
 
@@ -544,8 +718,8 @@ class TenantCard extends StatelessWidget {
                       radius: 35,
                       backgroundColor: Colors.white,
                       child: Text(
-                        tenant.name.isNotEmpty
-                            ? tenant.name[0].toUpperCase()
+                        tenant.firstname.isNotEmpty
+                            ? tenant.firstname[0].toUpperCase()
                             : '?',
                         style: TextStyle(
                           fontSize: 30,
@@ -561,7 +735,7 @@ class TenantCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            tenant.name,
+                            '${tenant.firstname} ${tenant.lastname}',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -592,11 +766,11 @@ class TenantCard extends StatelessWidget {
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(tenant.paymentStatus),
+                    color: _getStatusColor(tenant.status),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    tenant.paymentStatus.toUpperCase(),
+                    tenant.status.toUpperCase(),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -618,7 +792,7 @@ class TenantCard extends StatelessWidget {
                     SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        tenant.propertyName,
+                        'House #${tenant.houseNo}',
                         style: TextStyle(color: Colors.grey),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -632,7 +806,7 @@ class TenantCard extends StatelessWidget {
                     Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                     SizedBox(width: 4),
                     Text(
-                      'Lease: ${_formatDate(tenant.leaseStart)} - ${_formatDate(tenant.leaseEnd)}',
+                      'Date In: ${tenant.dateIn}',
                       style: TextStyle(color: Colors.grey),
                     ),
                   ],
@@ -646,12 +820,24 @@ class TenantCard extends StatelessWidget {
                       '₱${tenant.monthlyRent.toStringAsFixed(2)}/month',
                       style: TextStyle(color: Colors.grey),
                     ),
-                    SizedBox(width: 16),
-                    Icon(Icons.security, size: 16, color: Colors.grey),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.account_balance_wallet,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
                     SizedBox(width: 4),
                     Text(
-                      'Deposit: ${tenant.depositPaid ? 'Paid' : 'Unpaid'}',
-                      style: TextStyle(color: Colors.grey),
+                      tenant.outstanding > 0 ? 'Outstanding: ₱${tenant.outstanding.toStringAsFixed(2)}' : 'Outstanding: ₱0.00',
+                      style: TextStyle(
+                        color:
+                            tenant.outstanding > 0 ? Colors.red : Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -677,6 +863,10 @@ class TenantCard extends StatelessWidget {
                         onPressed: onDelete,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
+                          textStyle: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         child: Text('Delete'),
                       ),
@@ -702,9 +892,5 @@ class TenantCard extends StatelessWidget {
       default:
         return Colors.grey;
     }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
   }
 }

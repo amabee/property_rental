@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:real_estate/data/queries/houseTypes.dart';
 import 'package:real_estate/models/house_types.dart';
+import 'package:real_estate/pages/login_page.dart';
 import 'package:real_estate/pages/staff_pages/dashboard.dart';
 import 'package:real_estate/pages/staff_pages/houses.dart';
 import 'package:real_estate/pages/staff_pages/payments.dart';
@@ -17,13 +20,50 @@ class StaffHouseTypesScreen extends StatefulWidget {
 }
 
 class _StaffHouseTypesScreenState extends State<StaffHouseTypesScreen> {
-  final List<HouseType> _houseTypes = [
-    HouseType(id: '1', name: 'Studio'),
-    HouseType(id: '2', name: 'Apartment'),
-    HouseType(id: '3', name: 'Townhouse'),
-    HouseType(id: '4', name: 'Bungalow'),
-    HouseType(id: '5', name: 'Villa'),
-  ];
+  List<HouseType> _houseTypes = [];
+  String userName = "User";
+  String userUsername = "";
+
+  @override
+  void initState() {
+    super.initState();
+    fetchHouseTypes();
+    getUserData();
+  }
+
+  Future<void> fetchHouseTypes() async {
+    final data = await getHouseTypes();
+
+    if (data != null) {
+      setState(() {
+        _houseTypes =
+            data.map<HouseType>((item) {
+              return HouseType(id: item['id'].toString(), name: item['name']);
+            }).toList();
+      });
+    } else {
+      print("Failed to fetch house types.");
+    }
+  }
+
+  Future<void> getUserData() async {
+    try {
+      final box = Hive.box('myBox');
+      final name = box.get('name');
+      final username = box.get('username');
+
+      print(box);
+
+      if (name != null) {
+        setState(() {
+          userName = name;
+          userUsername = username ?? "";
+        });
+      }
+    } catch (e) {
+      print("Error retrieving user data: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,11 +189,11 @@ class _StaffHouseTypesScreenState extends State<StaffHouseTypesScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'Staff User',
+                  userName,
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 Text(
-                  'staff@example.com',
+                  userUsername,
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
@@ -249,13 +289,18 @@ class _StaffHouseTypesScreenState extends State<StaffHouseTypesScreen> {
               );
             },
           ),
+
           Divider(),
           ListTile(
             leading: Icon(Icons.exit_to_app),
             title: Text('Logout'),
-            onTap: () {
-              Navigator.pop(context);
-              // Add logout logic here
+            onTap: () async {
+              bool confirm = await _showLogoutConfirmationDialog();
+              if (confirm) {
+                await _performLogout();
+              } else {
+                Navigator.pop(context);
+              }
             },
           ),
         ],
@@ -292,6 +337,7 @@ class _StaffHouseTypesScreenState extends State<StaffHouseTypesScreen> {
                             border: OutlineInputBorder(),
                           ),
                         ),
+                        SizedBox(height: 16),
                       ],
                     ),
                   ),
@@ -302,17 +348,25 @@ class _StaffHouseTypesScreenState extends State<StaffHouseTypesScreen> {
                     ),
                     ElevatedButton(
                       child: Text(isEditing ? 'Update' : 'Add'),
-                      onPressed: () {
-                        // In a real app, validate inputs and save to database
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isEditing
-                                  ? 'House type updated!'
-                                  : 'New house type added!',
-                            ),
-                          ),
-                        );
+                      onPressed: () async {
+                        try {
+                          if (isEditing) {
+                            await updateCategory(
+                              context,
+                              houseType.id,
+                              nameController.text,
+                            );
+                          } else {
+                            await addCategory(context, nameController.text);
+                          }
+                        } catch (error) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Something went wrong!')),
+                          );
+                        } finally {
+                          await fetchHouseTypes();
+                        }
+
                         Navigator.of(context).pop();
                       },
                     ),
@@ -342,16 +396,71 @@ class _StaffHouseTypesScreenState extends State<StaffHouseTypesScreen> {
               ElevatedButton(
                 child: Text('Delete'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: () {
-                  // In a real app, delete from database
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('House type deleted!')),
-                  );
+                onPressed: () async {
+                  await deleteCategory(context, houseType.id);
+                  await fetchHouseTypes();
                   Navigator.of(context).pop();
                 },
               ),
             ],
           ),
     );
+  }
+
+  Future<bool> _showLogoutConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text(
+                'Are you sure you want to logout? All local data will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: Text('Logout'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(child: CircularProgressIndicator());
+        },
+      );
+
+      await Hive.box('myBox').clear();
+
+      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => LoginScreen(
+                toggleTheme: widget.toggleTheme,
+                isDarkMode: widget.isDarkMode,
+              ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
+    }
   }
 }

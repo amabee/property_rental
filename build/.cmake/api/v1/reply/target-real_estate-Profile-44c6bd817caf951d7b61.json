@@ -351,12 +351,12 @@
 	"dependencies" : 
 	[
 		{
-			"backtrace" : 11,
-			"id" : "flutter_assemble::@2bb09fbb03a373b2cb34"
-		},
-		{
 			"backtrace" : 4,
 			"id" : "flutter_wrapper_app::@2bb09fbb03a373b2cb34"
+		},
+		{
+			"backtrace" : 11,
+			"id" : "flutter_assemble::@2bb09fbb03a373b2cb34"
 		},
 		{
 			"backtrace" : 8,

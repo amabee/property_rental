@@ -24,11 +24,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int totalHouses = 0;
   int totalTenants = 0;
   double paymentsThisMonth = 0.0;
+  String userName = "User";
+  String userUsername = "";
 
   @override
   void initState() {
     super.initState();
     fetchDashboardData();
+    getUserData();
   }
 
   Future<void> fetchDashboardData() async {
@@ -42,6 +45,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
     } else {
       print("Failed to fetch dashboard data.");
+    }
+  }
+
+  Future<void> getUserData() async {
+    try {
+      final box = Hive.box('myBox');
+      final name = box.get('name');
+      final username = box.get('username');
+
+      print(box);
+
+      if (name != null) {
+        setState(() {
+          userName = name;
+          userUsername = username ?? "";
+        });
+      }
+    } catch (e) {
+      print("Error retrieving user data: $e");
     }
   }
 
@@ -227,11 +249,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'John Smith',
+                  userName,
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 Text(
-                  'john.smith@example.com',
+                  "@$userUsername",
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],

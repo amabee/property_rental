@@ -23,11 +23,14 @@ class HouseTypesScreen extends StatefulWidget {
 
 class _HouseTypesScreenState extends State<HouseTypesScreen> {
   List<HouseType> _houseTypes = [];
+  String userName = "User";
+  String userUsername = "";
 
   @override
   void initState() {
     super.initState();
     fetchHouseTypes();
+    getUserData();
   }
 
   Future<void> fetchHouseTypes() async {
@@ -42,6 +45,25 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
       });
     } else {
       print("Failed to fetch house types.");
+    }
+  }
+
+  Future<void> getUserData() async {
+    try {
+      final box = Hive.box('myBox');
+      final name = box.get('name');
+      final username = box.get('username');
+
+      print(box);
+
+      if (name != null) {
+        setState(() {
+          userName = name;
+          userUsername = username ?? "";
+        });
+      }
+    } catch (e) {
+      print("Error retrieving user data: $e");
     }
   }
 
@@ -169,11 +191,11 @@ class _HouseTypesScreenState extends State<HouseTypesScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'John Smith',
+                  userName,
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 Text(
-                  'john.smith@example.com',
+                  userUsername,
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],

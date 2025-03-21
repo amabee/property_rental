@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:real_estate/data/queries/payments.dart';
+import 'package:real_estate/data/queries/tenants.dart';
 import 'package:real_estate/models/payment.dart';
 import 'package:real_estate/pages/staff_pages/dashboard.dart';
 import 'package:real_estate/pages/staff_pages/house_types.dart';
@@ -22,16 +25,118 @@ class StaffPaymentsScreen extends StatefulWidget {
 }
 
 class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
-  // Sample payment data
-  final List<Payment> _payments = [];
-
-  String _searchQuery = '';
+  List<Payment> _payments = [];
   List<Payment> _filteredPayments = [];
+  List<dynamic> _tenants = [];
+  bool _isLoadingTenants = false;
+  String _searchQuery = '';
+  bool _isLoading = true;
+  String? _error;
+
+  String userName = "User";
+  String userUsername = "";
 
   @override
   void initState() {
     super.initState();
-    _filteredPayments = List.from(_payments);
+    _fetchPayments();
+    _fetchTenants();
+    getUserData();
+  }
+
+  Future<void> getUserData() async {
+    try {
+      final box = Hive.box('myBox');
+      final name = box.get('name');
+      final username = box.get('username');
+
+      print(box);
+
+      if (name != null) {
+        setState(() {
+          userName = name;
+          userUsername = username ?? "";
+        });
+      }
+    } catch (e) {
+      print("Error retrieving user data: $e");
+    }
+  }
+
+  Future<void> _fetchTenants() async {
+    setState(() {
+      _isLoadingTenants = true;
+    });
+
+    try {
+      final tenantsData = await getTenants();
+
+      if (tenantsData != null) {
+        setState(() {
+          _tenants = tenantsData;
+          _isLoadingTenants = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingTenants = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load tenants')));
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingTenants = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading tenants: $e')));
+    }
+  }
+
+  Future<void> _fetchPayments() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final paymentsData = await getPayments();
+
+      if (paymentsData != null) {
+        setState(() {
+          _payments =
+              paymentsData
+                  .map(
+                    (data) => Payment(
+                      id: data['payment_id'].toString(),
+                      date: DateTime.parse(data['date_created']),
+                      tenantName:
+                          data['firstname'] +
+                          ' ' +
+                          data['middlename'] +
+                          ' ' +
+                          data['lastname'],
+                      invoiceNumber: data['invoice'],
+                      amount: data['amount'],
+                    ),
+                  )
+                  .toList();
+          _filteredPayments = List.from(_payments);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = 'Unable to load payments';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Error loading payments: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   void _filterPayments(String query) {
@@ -101,6 +206,170 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
     );
   }
 
+  void _showAddPaymentModal() {
+    String? selectedTenantId;
+    final amountController = TextEditingController();
+    final invoiceController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: EdgeInsets.all(20),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Add New Payment',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+
+                      // Tenant Dropdown
+                      _isLoadingTenants
+                          ? Center(child: CircularProgressIndicator())
+                          : _tenants.isEmpty
+                          ? OutlinedButton(
+                            onPressed: () async {
+                              await _fetchTenants();
+                              setModalState(() {});
+                            },
+                            child: Text('Load Tenants'),
+                          )
+                          : DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              labelText: 'Select Tenant',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.person),
+                            ),
+                            value: selectedTenantId,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please select a tenant';
+                              }
+                              return null;
+                            },
+                            items:
+                                _tenants.map((tenant) {
+                                  String fullName =
+                                      tenant['firstname'] +
+                                      ' ' +
+                                      tenant['middlename'] +
+                                      ' ' +
+                                      tenant['lastname'];
+
+                                  return DropdownMenuItem<String>(
+                                    value: tenant['id'].toString(),
+                                    child: Text(
+                                      fullName,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                            onChanged: (String? newValue) {
+                              setModalState(() {
+                                selectedTenantId = newValue;
+                              });
+                            },
+                          ),
+                      SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: invoiceController,
+                        decoration: InputDecoration(
+                          labelText: 'Invoice Number',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.receipt),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter an invoice number';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: amountController,
+                        decoration: InputDecoration(
+                          labelText: 'Amount (₱)',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.attach_money),
+                        ),
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter an amount';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          if (double.parse(value) <= 0) {
+                            return 'Amount must be greater than zero';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 24),
+
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        onPressed: () async {
+                          await addPayment(
+                            context,
+                            selectedTenantId!,
+                            amountController.text,
+                            invoiceController.text,
+                          );
+                          if (formKey.currentState!.validate()) {
+                            Navigator.pop(context);
+                          }
+                          _fetchPayments();
+                        },
+                        child: Text('Submit Payment'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showPaymentDetails(BuildContext context, Payment payment) {
     showDialog(
       context: context,
@@ -154,10 +423,187 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
   }
 
   void _editPayment(Payment payment) {
-    // Here you would navigate to an edit form or show a modal
-    // For now, just show a snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Edit payment: ${payment.invoiceNumber}')),
+    String? selectedTenantId;
+    final amountController = TextEditingController(
+      text: payment.amount.toString(),
+    );
+    final invoiceController = TextEditingController(
+      text: payment.invoiceNumber,
+    );
+    final formKey = GlobalKey<FormState>();
+
+    if (_tenants.isNotEmpty) {
+      for (var tenant in _tenants) {
+        String fullName =
+            tenant['firstname'] +
+            ' ' +
+            tenant['middlename'] +
+            ' ' +
+            tenant['lastname'];
+        if (fullName == payment.tenantName) {
+          selectedTenantId = tenant['id'].toString();
+          break;
+        }
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: EdgeInsets.all(20),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Edit Payment',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+
+                      // Tenant Dropdown
+                      _isLoadingTenants
+                          ? Center(child: CircularProgressIndicator())
+                          : _tenants.isEmpty
+                          ? OutlinedButton(
+                            onPressed: () async {
+                              await _fetchTenants();
+                              setModalState(() {});
+                            },
+                            child: Text('Load Tenants'),
+                          )
+                          : DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              labelText: 'Select Tenant',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.person),
+                            ),
+                            value: selectedTenantId,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please select a tenant';
+                              }
+                              return null;
+                            },
+                            items:
+                                _tenants.map((tenant) {
+                                  String fullName =
+                                      tenant['firstname'] +
+                                      ' ' +
+                                      tenant['middlename'] +
+                                      ' ' +
+                                      tenant['lastname'];
+
+                                  return DropdownMenuItem<String>(
+                                    value: tenant['id'].toString(),
+                                    child: Text(
+                                      fullName,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                            onChanged: (String? newValue) {
+                              setModalState(() {
+                                selectedTenantId = newValue;
+                              });
+                            },
+                          ),
+                      SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: invoiceController,
+                        decoration: InputDecoration(
+                          labelText: 'Invoice Number',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.receipt),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter an invoice number';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: amountController,
+                        decoration: InputDecoration(
+                          labelText: 'Amount (₱)',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.attach_money),
+                        ),
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter an amount';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          if (double.parse(value) <= 0) {
+                            return 'Amount must be greater than zero';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 24),
+
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        onPressed: () async {
+                          await updatePayment(
+                            context,
+                            int.parse(payment.id),
+                            selectedTenantId!,
+                            amountController.text,
+                            invoiceController.text,
+                          );
+
+                          if (formKey.currentState!.validate()) {
+                            Navigator.pop(context);
+                            _fetchPayments();
+                          }
+                        },
+                        child: Text('Update Payment'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -176,15 +622,12 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
               child: Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
+                await deletePayment(context, payment.id);
+
                 Navigator.of(context).pop();
-                setState(() {
-                  _payments.removeWhere((item) => item.id == payment.id);
-                  _filteredPayments = List.from(_payments);
-                });
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Payment deleted')));
+
+                _fetchPayments();
               },
               child: Text('Delete', style: TextStyle(color: Colors.red)),
             ),
@@ -228,7 +671,29 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
           ),
           Expanded(
             child:
-                _filteredPayments.isEmpty
+                _isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : _error != null
+                    ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 60,
+                            color: Colors.red,
+                          ),
+                          SizedBox(height: 16),
+                          Text(_error!, style: TextStyle(fontSize: 16)),
+                          SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchPayments,
+                            child: Text('Try Again'),
+                          ),
+                        ],
+                      ),
+                    )
+                    : _filteredPayments.isEmpty
                     ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -246,21 +711,22 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
                         ],
                       ),
                     )
-                    : ListView.builder(
-                      itemCount: _filteredPayments.length,
-                      itemBuilder: (context, index) {
-                        final payment = _filteredPayments[index];
-                        return _buildPaymentCard(payment);
-                      },
+                    : RefreshIndicator(
+                      onRefresh: _fetchPayments,
+                      child: ListView.builder(
+                        itemCount: _filteredPayments.length,
+                        itemBuilder: (context, index) {
+                          final payment = _filteredPayments[index];
+                          return _buildPaymentCard(payment);
+                        },
+                      ),
                     ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Add new payment')));
+          _showAddPaymentModal();
         },
         child: Icon(Icons.add),
       ),
@@ -288,7 +754,7 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
                     child: Text(
                       payment.tenantName,
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                       maxLines: 1,
@@ -296,7 +762,7 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
                     ),
                   ),
                   Text(
-                    '₱${payment.amount.toStringAsFixed(2)}',
+                    payment.amount > 0 ? '₱${payment.amount.toStringAsFixed(2)}' : "0.00",
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -374,11 +840,11 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'Staff Member',
+                  userName,
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 Text(
-                  'staff@example.com',
+                  userUsername,
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
@@ -401,7 +867,7 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
             },
           ),
           ListTile(
-            leading: Icon(Icons.category),
+            leading: Icon(Icons.dashboard),
             title: Text('House Types'),
             onTap: () {
               Navigator.pop(context);
@@ -476,21 +942,74 @@ class _StaffPaymentsScreenState extends State<StaffPaymentsScreen> {
           ListTile(
             leading: Icon(Icons.exit_to_app),
             title: Text('Logout'),
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => LoginScreen(
-                        toggleTheme: widget.toggleTheme,
-                        isDarkMode: widget.isDarkMode,
-                      ),
-                ),
-              );
+            onTap: () async {
+              bool confirm = await _showLogoutConfirmationDialog();
+              if (confirm) {
+                await _performLogout();
+              } else {
+                Navigator.pop(context);
+              }
             },
           ),
         ],
       ),
     );
+  }
+
+  Future<bool> _showLogoutConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text(
+                'Are you sure you want to logout? All local data will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: Text('Logout'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(child: CircularProgressIndicator());
+        },
+      );
+
+      await Hive.box('myBox').clear();
+
+      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => LoginScreen(
+                toggleTheme: widget.toggleTheme,
+                isDarkMode: widget.isDarkMode,
+              ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error during logout: $e')));
+    }
   }
 }
